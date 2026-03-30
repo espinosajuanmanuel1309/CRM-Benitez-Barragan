@@ -1,0 +1,490 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { useRouter } from 'next/navigation'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import Sidebar from '../lib/Navbar'
+
+export default function DashboardPage() {
+  const [usuario, setUsuario] = useState(null)
+  const [rol, setRol] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const [kpis, setKpis] = useState({ horasMes: 0, horasMesAnterior: 0, clientesActivos: 0, asociadosActivos: 0 })
+  const [horasPorCliente, setHorasPorCliente] = useState([])
+  const [horasPorAsociado, setHorasPorAsociado] = useState([])
+  const [horasPorHonorario, setHorasPorHonorario] = useState([])
+  const [alertas, setAlertas] = useState([])
+  const [misHoras, setMisHoras] = useState({ total: 0, porCliente: [] })
+  const [clientes, setClientes] = useState([])
+  const [usuarios, setUsuarios] = useState([])
+  const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
+  const [filtroFechaFin, setFiltroFechaFin] = useState('')
+  const [filtroCliente, setFiltroCliente] = useState('')
+  const [filtroAsociado, setFiltroAsociado] = useState('')
+  const [usuarioActualId, setUsuarioActualId] = useState(null)
+  const router = useRouter()
+
+  const mesActual = new Date().getMonth() + 1
+  const anioActual = new Date().getFullYear()
+  const mesAnterior = mesActual === 1 ? 12 : mesActual - 1
+  const anioMesAnterior = mesActual === 1 ? anioActual - 1 : anioActual
+
+  const primerDiaMes = `${anioActual}-${String(mesActual).padStart(2, '0')}-01`
+  const ultimoDiaMes = new Date(anioActual, mesActual, 0).toISOString().split('T')[0]
+  const primerDiaMesAnterior = `${anioMesAnterior}-${String(mesAnterior).padStart(2, '0')}-01`
+  const ultimoDiaMesAnterior = new Date(anioMesAnterior, mesAnterior, 0).toISOString().split('T')[0]
+
+  useEffect(() => {
+    inicializar()
+  }, [])
+
+  const inicializar = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    const { data: usuarioData } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    setUsuario(usuarioData)
+    setRol(usuarioData?.rol || 'normal')
+    setUsuarioActualId(user.id)
+
+    const [{ data: clientesData }, { data: usuariosData }] = await Promise.all([
+      supabase.from('clientes').select('*').eq('activo', true).order('nombre'),
+      supabase.from('usuarios').select('*').eq('activo', true).order('nombre_completo')
+    ])
+    setClientes(clientesData || [])
+    setUsuarios(usuariosData || [])
+
+    if (usuarioData?.rol === 'admin') {
+      await cargarDatosAdmin({ fechaInicio: primerDiaMes, fechaFin: ultimoDiaMes })
+    } else {
+      await cargarDatosNormal(user.id, { fechaInicio: primerDiaMes, fechaFin: ultimoDiaMes })
+    }
+    setCargando(false)
+  }
+
+  const cargarDatosAdmin = async (filtros = {}) => {
+    setCargando(true)
+    const fechaInicio = filtros.fechaInicio || primerDiaMes
+    const fechaFin = filtros.fechaFin || ultimoDiaMes
+
+    let queryRegistros = supabase
+      .from('registros')
+      .select('*, clientes(nombre), honorarios(nombre), usuarios(nombre_completo)')
+      .gte('fecha_registro', fechaInicio)
+      .lte('fecha_registro', fechaFin)
+
+    if (filtros.cliente) queryRegistros = queryRegistros.eq('cliente_id', parseInt(filtros.cliente))
+    if (filtros.asociado) queryRegistros = queryRegistros.eq('usuario_id', filtros.asociado)
+
+    const [
+      { data: registrosMes },
+      { data: registrosMesAnterior },
+      { data: clientesData },
+      { data: usuariosData },
+      { data: presupuestos }
+    ] = await Promise.all([
+      queryRegistros,
+      supabase.from('registros').select('horas, minutos').gte('fecha_registro', primerDiaMesAnterior).lte('fecha_registro', ultimoDiaMesAnterior),
+      supabase.from('clientes').select('*').eq('activo', true),
+      supabase.from('usuarios').select('*').eq('activo', true),
+      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioActual)
+    ])
+
+    const totalHorasMes = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
+    const totalHorasMesAnterior = registrosMesAnterior?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
+
+    setKpis({
+      horasMes: totalHorasMes,
+      horasMesAnterior: totalHorasMesAnterior,
+      clientesActivos: clientesData?.length || 0,
+      asociadosActivos: usuariosData?.length || 0
+    })
+
+    const porCliente = {}
+    registrosMes?.forEach(r => {
+      const nombre = r.clientes?.nombre || 'Sin cliente'
+      porCliente[nombre] = (porCliente[nombre] || 0) + r.horas + r.minutos / 60
+    })
+    setHorasPorCliente(
+      Object.entries(porCliente)
+        .map(([nombre, horas]) => ({ nombre: nombre.length > 20 ? nombre.substring(0, 20) + '...' : nombre, horas: parseFloat(horas.toFixed(2)) }))
+        .sort((a, b) => b.horas - a.horas)
+        .slice(0, 10)
+    )
+
+    const porAsociado = {}
+    registrosMes?.forEach(r => {
+      const nombre = r.usuarios?.nombre_completo || 'Sin nombre'
+      porAsociado[nombre] = (porAsociado[nombre] || 0) + r.horas + r.minutos / 60
+    })
+    setHorasPorAsociado(
+      Object.entries(porAsociado)
+        .map(([nombre, horas]) => ({ nombre, horas: parseFloat(horas.toFixed(2)) }))
+        .sort((a, b) => b.horas - a.horas)
+    )
+
+    const porHonorario = {}
+    registrosMes?.forEach(r => {
+      const nombre = r.honorarios?.nombre || 'Sin honorario'
+      porHonorario[nombre] = (porHonorario[nombre] || 0) + r.horas + r.minutos / 60
+    })
+    setHorasPorHonorario(
+      Object.entries(porHonorario)
+        .map(([nombre, horas]) => ({ nombre: nombre.replace('Honorarios por ', '').replace('Honorarios ', ''), horas: parseFloat(horas.toFixed(2)) }))
+        .sort((a, b) => b.horas - a.horas)
+    )
+
+    const horasPorClienteCompleto = {}
+    registrosMes?.forEach(r => {
+      horasPorClienteCompleto[r.cliente_id] = (horasPorClienteCompleto[r.cliente_id] || 0) + r.horas + r.minutos / 60
+    })
+
+    const alertasData = []
+    presupuestos?.forEach(p => {
+      if (p.horas_mes > 0) {
+        const horasUsadas = horasPorClienteCompleto[p.cliente_id] || 0
+        const porcentaje = (horasUsadas / p.horas_mes) * 100
+        if (porcentaje >= 80) {
+          alertasData.push({
+            cliente: p.clientes?.nombre,
+            honorario: p.honorarios?.nombre,
+            horasUsadas: parseFloat(horasUsadas.toFixed(2)),
+            horasPresupuesto: p.horas_mes,
+            porcentaje: parseFloat(porcentaje.toFixed(0))
+          })
+        }
+      }
+    })
+    setAlertas(alertasData.sort((a, b) => b.porcentaje - a.porcentaje))
+    setCargando(false)
+  }
+
+  const cargarDatosNormal = async (userId, filtros = {}) => {
+    setCargando(true)
+    const fechaInicio = filtros.fechaInicio || primerDiaMes
+    const fechaFin = filtros.fechaFin || ultimoDiaMes
+
+    let query = supabase
+      .from('registros')
+      .select('*, clientes(id, nombre), honorarios(nombre)')
+      .eq('usuario_id', userId)
+      .gte('fecha_registro', fechaInicio)
+      .lte('fecha_registro', fechaFin)
+
+    if (filtros.cliente) query = query.eq('cliente_id', parseInt(filtros.cliente))
+
+    const { data: registrosMes } = await query
+    const totalHoras = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
+
+    const porCliente = {}
+    registrosMes?.forEach(r => {
+      const key = r.cliente_id
+      if (!porCliente[key]) porCliente[key] = { nombre: r.clientes?.nombre, horas: 0, cliente_id: r.cliente_id }
+      porCliente[key].horas += r.horas + r.minutos / 60
+    })
+
+    const clientesIds = Object.keys(porCliente)
+    const totalesDespacho = await Promise.all(
+      clientesIds.map(async (clienteId) => {
+        const { data } = await supabase
+          .from('registros')
+          .select('horas, minutos')
+          .eq('cliente_id', parseInt(clienteId))
+          .gte('fecha_registro', fechaInicio)
+          .lte('fecha_registro', fechaFin)
+        const total = data?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
+        return { clienteId, totalDespacho: total }
+      })
+    )
+
+    const porClienteConTotal = Object.values(porCliente).map(c => {
+      const despacho = totalesDespacho.find(t => t.clienteId === String(c.cliente_id))
+      return {
+        ...c,
+        horas: parseFloat(c.horas.toFixed(2)),
+        totalDespacho: parseFloat((despacho?.totalDespacho || 0).toFixed(2))
+      }
+    })
+
+    setMisHoras({ total: totalHoras, porCliente: porClienteConTotal })
+    setCargando(false)
+  }
+
+  const handleFiltrar = () => {
+    const filtros = {
+      fechaInicio: filtroFechaInicio || primerDiaMes,
+      fechaFin: filtroFechaFin || ultimoDiaMes,
+      cliente: filtroCliente || null,
+      asociado: filtroAsociado || null
+    }
+    if (rol === 'admin') {
+      cargarDatosAdmin(filtros)
+    } else {
+      cargarDatosNormal(usuarioActualId, filtros)
+    }
+  }
+
+  const handleLimpiar = () => {
+    setFiltroFechaInicio('')
+    setFiltroFechaFin('')
+    setFiltroCliente('')
+    setFiltroAsociado('')
+    if (rol === 'admin') {
+      cargarDatosAdmin({ fechaInicio: primerDiaMes, fechaFin: ultimoDiaMes })
+    } else {
+      cargarDatosNormal(usuarioActualId, { fechaInicio: primerDiaMes, fechaFin: ultimoDiaMes })
+    }
+  }
+
+  const COLORS = ['#1B2A4A', '#2E4A8C', '#4A7CC9', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981']
+
+  const nombreMes = new Date(anioActual, mesActual - 1).toLocaleString('es-MX', { month: 'long', year: 'numeric' })
+  const variacionMes = kpis.horasMesAnterior > 0 ? ((kpis.horasMes - kpis.horasMesAnterior) / kpis.horasMesAnterior * 100).toFixed(1) : null
+
+  if (cargando) return (
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6fa', colorScheme: 'light' }}>
+      <Sidebar rol={rol} nombreUsuario={usuario?.nombre_completo} />
+      <div style={{ marginLeft: '240px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#6b7280' }}>Cargando dashboard...</p>
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6fa', colorScheme: 'light' }}>
+      <Sidebar rol={rol} nombreUsuario={usuario?.nombre_completo} />
+
+      <div style={{ marginLeft: '240px', flex: 1, padding: '36px 40px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+
+          {/* Header */}
+          <div style={{ marginBottom: '32px' }}>
+            <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 6px', fontWeight: '500' }}>
+              Bienvenido, {usuario?.nombre_completo}
+            </p>
+            <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1B2A4A', margin: '0 0 2px', textTransform: 'capitalize', letterSpacing: '-0.5px' }}>
+              Dashboard
+            </h1>
+            <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, textTransform: 'capitalize' }}>{nombreMes}</p>
+          </div>
+
+          {/* Filtros */}
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '18px 20px', marginBottom: '28px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+            <p style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '1px', textTransform: 'uppercase', margin: '0 0 14px' }}>Filtros</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Fecha inicio</label>
+                <input type="date" value={filtroFechaInicio} onChange={e => setFiltroFechaInicio(e.target.value)}
+                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Fecha fin</label>
+                <input type="date" value={filtroFechaFin} onChange={e => setFiltroFechaFin(e.target.value)}
+                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Cliente</label>
+                <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)}
+                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }}>
+                  <option value="">Todos los clientes</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+              </div>
+              {rol === 'admin' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Asociado</label>
+                  <select value={filtroAsociado} onChange={e => setFiltroAsociado(e.target.value)}
+                    style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }}>
+                    <option value="">Todos los asociados</option>
+                    {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre_completo}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleFiltrar}
+                  style={{ backgroundColor: '#1B2A4A', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  Aplicar
+                </button>
+                <button onClick={handleLimpiar}
+                  style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer' }}>
+                  Limpiar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {rol === 'admin' ? (
+            <>
+              {/* KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+                {[
+                  { label: 'Horas del período', value: `${kpis.horasMes.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A', sub: variacionMes && !filtroFechaInicio ? `${parseFloat(variacionMes) >= 0 ? '↑' : '↓'} ${Math.abs(variacionMes)}% vs mes anterior` : null, subOk: parseFloat(variacionMes) >= 0 },
+                  { label: 'Mes anterior', value: `${kpis.horasMesAnterior.toFixed(1)}h`, icon: '📅', bg: '#2E4A8C' },
+                  { label: 'Clientes activos', value: kpis.clientesActivos, icon: '🏢', bg: '#1B2A4A' },
+                  { label: 'Asociados activos', value: kpis.asociadosActivos, icon: '👥', bg: '#2E4A8C' },
+                ].map((kpi, i) => (
+                  <div key={i} style={{ backgroundColor: kpi.bg, borderRadius: '16px', padding: '22px 24px', boxShadow: '0 4px 16px rgba(27,42,74,0.25)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.55)', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>{kpi.label}</p>
+                      <span style={{ fontSize: '20px', opacity: 0.8 }}>{kpi.icon}</span>
+                    </div>
+                    <p style={{ fontSize: '34px', fontWeight: '800', color: 'white', margin: 0, letterSpacing: '-1.5px', lineHeight: 1 }}>{kpi.value}</p>
+                    {kpi.sub && (
+                      <p style={{ fontSize: '11px', fontWeight: '600', marginTop: '10px', margin: '10px 0 0', color: kpi.subOk ? '#86efac' : '#fca5a5' }}>{kpi.sub}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Alertas */}
+              {alertas.length > 0 && (
+                <div style={{ borderRadius: '16px', marginBottom: '28px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(234,88,12,0.15)', border: '1px solid #fed7aa' }}>
+                  <div style={{ backgroundColor: '#ea580c', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <h3 style={{ fontSize: '14px', fontWeight: '700', color: 'white', margin: 0 }}>Alertas de presupuesto</h3>
+                    <span style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', padding: '3px 12px', borderRadius: '99px' }}>{alertas.length} {alertas.length === 1 ? 'alerta' : 'alertas'}</span>
+                  </div>
+                  <div style={{ backgroundColor: 'white', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {alertas.map((a, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: '10px', backgroundColor: a.porcentaje >= 100 ? '#fef2f2' : '#fff7ed', border: `1px solid ${a.porcentaje >= 100 ? '#fecaca' : '#fed7aa'}` }}>
+                        <div>
+                          <p style={{ fontSize: '13px', fontWeight: '700', color: '#1f2937', margin: 0 }}>{a.cliente}</p>
+                          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '3px 0 0' }}>{a.honorario}</p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '11px', color: '#9ca3af', margin: '0 0 2px' }}>{a.horasUsadas}h / {a.horasPresupuesto}h</p>
+                            <div style={{ width: '100px', backgroundColor: '#e5e7eb', borderRadius: '99px', height: '5px' }}>
+                              <div style={{ backgroundColor: a.porcentaje >= 100 ? '#dc2626' : '#f97316', height: '5px', borderRadius: '99px', width: `${Math.min(a.porcentaje, 100)}%` }} />
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '16px', fontWeight: '800', color: a.porcentaje >= 100 ? '#dc2626' : '#ea580c', minWidth: '44px', textAlign: 'right' }}>{a.porcentaje}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Gráficas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top 10 clientes</h3>
+                  <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 16px' }}>Por horas registradas</p>
+                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                    {horasPorCliente.length === 0 ? <p style={{ color: '#9ca3af', fontSize: '13px' }}>Sin datos para este período</p> : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={horasPorCliente} layout="vertical" margin={{ left: 10, right: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                          <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                          <YAxis type="category" dataKey="nombre" tick={{ fontSize: 11, fill: '#6b7280' }} width={120} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '13px' }} formatter={(v) => [`${v}h`, 'Horas']} />
+                          <Bar dataKey="horas" fill="#1B2A4A" radius={[0, 6, 6, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Por honorario</h3>
+                  <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 16px' }}>Distribución de horas</p>
+                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                    {horasPorHonorario.length === 0 ? <p style={{ color: '#9ca3af', fontSize: '13px' }}>Sin datos para este período</p> : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie data={horasPorHonorario} dataKey="horas" nameKey="nombre" cx="50%" cy="50%" outerRadius={110} innerRadius={50} paddingAngle={2} label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                            {horasPorHonorario.map((_, index) => (
+                              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '13px' }} formatter={(value, name) => [`${value}h`, name]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Horas por asociado */}
+              <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Horas por asociado</h3>
+                <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 16px' }}>Rendimiento del equipo en el período</p>
+                <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                  {horasPorAsociado.length === 0 ? <p style={{ color: '#9ca3af', fontSize: '13px' }}>Sin datos para este período</p> : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {horasPorAsociado.map((a, i) => {
+                        const pct = Math.min((a.horas / (horasPorAsociado[0]?.horas || 1)) * 100, 100)
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#d1d5db', width: '18px', flexShrink: 0 }}>#{i + 1}</span>
+                            <span style={{ fontSize: '13px', color: '#374151', width: '180px', flexShrink: 0, fontWeight: i === 0 ? '600' : '400' }}>{a.nombre}</span>
+                            <div style={{ flex: 1, backgroundColor: '#f3f4f6', borderRadius: '99px', height: '8px' }}>
+                              <div style={{ backgroundColor: i === 0 ? '#1B2A4A' : '#4A7CC9', height: '8px', borderRadius: '99px', width: `${pct}%`, transition: 'width 0.4s ease' }} />
+                            </div>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', width: '52px', textAlign: 'right' }}>{a.horas}h</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                {[
+                  { label: 'Mis horas en el período', value: `${misHoras.total.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A' },
+                  { label: 'Clientes trabajados', value: misHoras.porCliente.length, icon: '🏢', bg: '#2E4A8C' },
+                ].map((kpi, i) => (
+                  <div key={i} style={{ backgroundColor: kpi.bg, borderRadius: '16px', padding: '22px 24px', boxShadow: '0 4px 16px rgba(27,42,74,0.25)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.55)', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>{kpi.label}</p>
+                      <span style={{ fontSize: '20px', opacity: 0.8 }}>{kpi.icon}</span>
+                    </div>
+                    <p style={{ fontSize: '34px', fontWeight: '800', color: 'white', margin: 0, letterSpacing: '-1.5px', lineHeight: 1 }}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid #f3f4f6' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mis horas por cliente</h3>
+                </div>
+                {misHoras.porCliente.length === 0 ? (
+                  <p style={{ color: '#6b7280', fontSize: '13px', padding: '24px' }}>No hay registros en este período.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f9fafb' }}>
+                        <th style={{ textAlign: 'left', padding: '12px 24px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cliente</th>
+                        <th style={{ textAlign: 'left', padding: '12px 24px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mis horas</th>
+                        <th style={{ textAlign: 'left', padding: '12px 24px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total despacho</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {misHoras.porCliente.map((c, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '13px 24px', fontSize: '13px', color: '#374151', fontWeight: '500' }}>{c.nombre}</td>
+                          <td style={{ padding: '13px 24px', fontSize: '13px', fontWeight: '700', color: '#1B2A4A' }}>{c.horas}h</td>
+                          <td style={{ padding: '13px 24px', fontSize: '13px', color: '#9ca3af' }}>{c.totalDespacho}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
