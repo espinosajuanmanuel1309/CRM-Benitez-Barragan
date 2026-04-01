@@ -188,7 +188,7 @@ export default function ClienteDetallePage() {
 
                       {h.presupuesto > 0 && (
                         <div style={{ width: '100%', backgroundColor: '#f3f4f6', borderRadius: '99px', height: '6px', marginBottom: '10px' }}>
-                          <div style={{ backgroundColor: excede ? '#dc2626' : '#1B2A4A', height: '6px', borderRadius: '99px', width: `${Math.min(parseFloat(porcentaje), 100)}%` }} />
+                          <div style={{ backgroundColor: excede ? '#dc2626' : '#16a34a', height: '6px', borderRadius: '99px', width: `${Math.min(parseFloat(porcentaje), 100)}%` }} />
                         </div>
                       )}
 

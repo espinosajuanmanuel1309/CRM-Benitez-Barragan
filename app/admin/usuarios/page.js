@@ -14,6 +14,7 @@ export default function UsuariosPage() {
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
+  const [verContrasena, setVerContrasena] = useState(false)
   const router = useRouter()
   const { verificando } = useAdmin()
 
@@ -101,7 +102,12 @@ export default function UsuariosPage() {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Contraseña temporal</label>
-                  <input type="password" name="contrasena" value={form.contrasena} onChange={handleChange} placeholder="Mínimo 6 caracteres" style={inputStyle} required />
+                  <div style={{ position: 'relative' }}>
+                    <input type={verContrasena ? 'text' : 'password'} name="contrasena" value={form.contrasena} onChange={handleChange} placeholder="Mínimo 6 caracteres" style={{ ...inputStyle, paddingRight: '36px' }} required />
+                    <button type="button" onClick={() => setVerContrasena(v => !v)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', lineHeight: 1, padding: 0 }}>
+                      {verContrasena ? '🙈' : '👁️'}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Rol</label>

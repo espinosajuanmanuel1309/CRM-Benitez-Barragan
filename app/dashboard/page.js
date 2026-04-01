@@ -172,7 +172,7 @@ export default function DashboardPage() {
 
     let query = supabase
       .from('registros')
-      .select('*, clientes(id, nombre), honorarios(nombre)')
+      .select('*, clientes(id, nombre), honorarios(id, nombre)')
       .eq('usuario_id', userId)
       .gte('fecha_registro', fechaInicio)
       .lte('fecha_registro', fechaFin)
@@ -182,37 +182,59 @@ export default function DashboardPage() {
     const { data: registrosMes } = await query
     const totalHoras = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
 
+    // Agrupar mis horas por cliente y honorario
     const porCliente = {}
     registrosMes?.forEach(r => {
-      const key = r.cliente_id
-      if (!porCliente[key]) porCliente[key] = { nombre: r.clientes?.nombre, horas: 0, cliente_id: r.cliente_id }
-      porCliente[key].horas += r.horas + r.minutos / 60
+      const cId = r.cliente_id
+      const hId = r.honorario_id
+      if (!porCliente[cId]) porCliente[cId] = { nombre: r.clientes?.nombre, cliente_id: cId, misHoras: 0, honorarios: {} }
+      porCliente[cId].misHoras += r.horas + r.minutos / 60
+      if (!porCliente[cId].honorarios[hId]) porCliente[cId].honorarios[hId] = { nombre: r.honorarios?.nombre, honorario_id: hId, misHoras: 0, totalDespacho: 0, presupuesto: null }
+      porCliente[cId].honorarios[hId].misHoras += r.horas + r.minutos / 60
     })
 
-    const clientesIds = Object.keys(porCliente)
-    const totalesDespacho = await Promise.all(
-      clientesIds.map(async (clienteId) => {
-        const { data } = await supabase
-          .from('registros')
-          .select('horas, minutos')
-          .eq('cliente_id', parseInt(clienteId))
-          .gte('fecha_registro', fechaInicio)
-          .lte('fecha_registro', fechaFin)
-        const total = data?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
-        return { clienteId, totalDespacho: total }
+    const clienteIds = Object.keys(porCliente).map(Number)
+
+    if (clienteIds.length > 0) {
+      // Total despacho (todos los asociados) por cliente+honorario en el período
+      const { data: todosRegistros } = await supabase
+        .from('registros')
+        .select('cliente_id, honorario_id, horas, minutos')
+        .in('cliente_id', clienteIds)
+        .gte('fecha_registro', fechaInicio)
+        .lte('fecha_registro', fechaFin)
+
+      todosRegistros?.forEach(r => {
+        if (porCliente[r.cliente_id]?.honorarios[r.honorario_id]) {
+          porCliente[r.cliente_id].honorarios[r.honorario_id].totalDespacho += r.horas + r.minutos / 60
+        }
       })
-    )
 
-    const porClienteConTotal = Object.values(porCliente).map(c => {
-      const despacho = totalesDespacho.find(t => t.clienteId === String(c.cliente_id))
-      return {
-        ...c,
-        horas: parseFloat(c.horas.toFixed(2)),
-        totalDespacho: parseFloat((despacho?.totalDespacho || 0).toFixed(2))
-      }
-    })
+      // Presupuestos del año para estos clientes
+      const { data: presupuestos } = await supabase
+        .from('presupuestos')
+        .select('cliente_id, honorario_id, horas_mes')
+        .in('cliente_id', clienteIds)
+        .eq('anio', anioActual)
 
-    setMisHoras({ total: totalHoras, porCliente: porClienteConTotal })
+      presupuestos?.forEach(p => {
+        if (porCliente[p.cliente_id]?.honorarios[p.honorario_id]) {
+          porCliente[p.cliente_id].honorarios[p.honorario_id].presupuesto = p.horas_mes
+        }
+      })
+    }
+
+    const porClienteArray = Object.values(porCliente).map(c => ({
+      ...c,
+      misHoras: parseFloat(c.misHoras.toFixed(2)),
+      honorarios: Object.values(c.honorarios).map(h => ({
+        ...h,
+        misHoras: parseFloat(h.misHoras.toFixed(2)),
+        totalDespacho: parseFloat(h.totalDespacho.toFixed(2))
+      })).sort((a, b) => b.misHoras - a.misHoras)
+    })).sort((a, b) => b.misHoras - a.misHoras)
+
+    setMisHoras({ total: totalHoras, porCliente: porClienteArray })
     setCargando(false)
   }
 
@@ -441,13 +463,13 @@ export default function DashboardPage() {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                 {[
-                  { label: 'Mis horas en el período', value: `${misHoras.total.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A' },
-                  { label: 'Clientes trabajados', value: misHoras.porCliente.length, icon: '🏢', bg: '#2E4A8C' },
+                  { label: 'Mis horas en el período', value: `${misHoras.total.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A', invertIcon: true },
+                  { label: 'Clientes trabajados', value: misHoras.porCliente.length, icon: '🏢', bg: '#2E4A8C', invertIcon: false },
                 ].map((kpi, i) => (
                   <div key={i} style={{ backgroundColor: kpi.bg, borderRadius: '16px', padding: '22px 24px', boxShadow: '0 4px 16px rgba(27,42,74,0.25)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                       <p style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.55)', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>{kpi.label}</p>
-                      <span style={{ fontSize: '20px', opacity: 0.8 }}>{kpi.icon}</span>
+                      <span style={{ fontSize: '20px', opacity: 0.8, filter: kpi.invertIcon ? 'brightness(0) invert(1)' : 'none' }}>{kpi.icon}</span>
                     </div>
                     <p style={{ fontSize: '34px', fontWeight: '800', color: 'white', margin: 0, letterSpacing: '-1.5px', lineHeight: 1 }}>{kpi.value}</p>
                   </div>
@@ -461,24 +483,52 @@ export default function DashboardPage() {
                 {misHoras.porCliente.length === 0 ? (
                   <p style={{ color: '#6b7280', fontSize: '13px', padding: '24px' }}>No hay registros en este período.</p>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f9fafb' }}>
-                        <th style={{ textAlign: 'left', padding: '12px 24px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cliente</th>
-                        <th style={{ textAlign: 'left', padding: '12px 24px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mis horas</th>
-                        <th style={{ textAlign: 'left', padding: '12px 24px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total despacho</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {misHoras.porCliente.map((c, i) => (
-                        <tr key={i} style={{ borderTop: '1px solid #f3f4f6' }}>
-                          <td style={{ padding: '13px 24px', fontSize: '13px', color: '#374151', fontWeight: '500' }}>{c.nombre}</td>
-                          <td style={{ padding: '13px 24px', fontSize: '13px', fontWeight: '700', color: '#1B2A4A' }}>{c.horas}h</td>
-                          <td style={{ padding: '13px 24px', fontSize: '13px', color: '#9ca3af' }}>{c.totalDespacho}h</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {misHoras.porCliente.map((c, i) => (
+                      <div key={i} style={{ padding: '20px 24px', borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '700', color: '#1B2A4A' }}>{c.nombre}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A' }}>{c.misHoras}h mis horas</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          {c.honorarios.map((h, j) => {
+                            const porcentaje = h.presupuesto > 0 ? (h.totalDespacho / h.presupuesto * 100).toFixed(0) : null
+                            const excede = porcentaje > 100
+                            return (
+                              <div key={j}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                  <span style={{ fontSize: '13px', color: '#374151', fontWeight: '500' }}>{h.nombre}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Mis horas: <strong style={{ color: '#1B2A4A' }}>{h.misHoras}h</strong></span>
+                                    {porcentaje !== null && (
+                                      <span style={{ fontSize: '11px', padding: '2px 9px', borderRadius: '99px', fontWeight: '700', backgroundColor: excede ? '#fef2f2' : '#f0fdf4', color: excede ? '#dc2626' : '#16a34a' }}>
+                                        {porcentaje}% de {h.presupuesto}h
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {porcentaje !== null && (
+                                  <div style={{ width: '100%', backgroundColor: '#f3f4f6', borderRadius: '99px', height: '5px' }}>
+                                    <div style={{ backgroundColor: excede ? '#dc2626' : '#16a34a', height: '5px', borderRadius: '99px', width: `${Math.min(parseFloat(porcentaje), 100)}%` }} />
+                                  </div>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                                  <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500' }}>Total despacho:</span>
+                                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#374151' }}>{h.totalDespacho}h</span>
+                                  {h.presupuesto > 0 && (
+                                    <>
+                                      <span style={{ fontSize: '11px', color: '#d1d5db' }}>/</span>
+                                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#6b7280' }}>{h.presupuesto}h presupuestado</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </>
