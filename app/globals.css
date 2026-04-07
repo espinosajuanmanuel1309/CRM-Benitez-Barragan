@@ -32,3 +32,90 @@ body {
 .page-transition {
   animation: fadeIn 0.18s ease-out;
 }
+
+/* ===== RESPONSIVE LAYOUT ===== */
+
+/* Barra superior para móvil (oculta en escritorio) */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background-color: #1B2A4A;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* Sidebar — animación en móvil */
+.sidebar-nav {
+  transition: transform 0.25s ease;
+}
+
+/* Área de contenido principal */
+.main-content {
+  margin-left: 240px;
+  flex: 1;
+}
+
+/* Grilla KPI — 4 columnas en escritorio */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Grilla de gráficas — 2 columnas en escritorio */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Tabla con scroll horizontal en pantallas pequeñas */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ===== TABLET (≤ 1023px): sidebar como cajón deslizante ===== */
+@media (max-width: 1023px) {
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .sidebar-nav {
+    transform: translateX(-100%);
+  }
+
+  .sidebar-nav.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding-top: 72px !important;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== MÓVIL (≤ 640px): padding reducido ===== */
+@media (max-width: 640px) {
+  .main-content {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

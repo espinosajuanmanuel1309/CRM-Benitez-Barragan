@@ -32,26 +32,34 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', colorScheme: 'light' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', colorScheme: 'light' }}
+      className="login-wrapper">
+
+      <style>{`
+        @media (min-width: 768px) {
+          .login-wrapper { flex-direction: row !important; }
+          .login-brand { width: 50% !important; padding: 48px !important; min-height: 100vh !important; }
+          .login-form-panel { width: 50% !important; }
+        }
+      `}</style>
 
       {/* Panel izquierdo — azul marino */}
-      <div style={{
-        width: '50%',
+      <div className="login-brand" style={{
         backgroundColor: '#1B2A4A',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '48px',
+        padding: '40px 32px',
       }}>
-        <Image 
+        <Image
           src="/logo-white.png"
           alt="BB&A Logo"
-          width={300}
-          height={300}
-          style={{ marginBottom: '24px' }}
+          width={220}
+          height={220}
+          style={{ marginBottom: '24px', maxWidth: '60vw', height: 'auto' }}
         />
-        <h1 style={{ color: 'white', fontSize: '24px', fontWeight: '700', textAlign: 'center', marginBottom: '12px' }}>
+        <h1 style={{ color: 'white', fontSize: '22px', fontWeight: '700', textAlign: 'center', marginBottom: '12px' }}>
           Benítez Barragán & Asociados
         </h1>
         <p style={{ color: '#94a3b8', fontSize: '14px', textAlign: 'center', maxWidth: '280px', lineHeight: '1.6' }}>
@@ -60,14 +68,13 @@ export default function LoginPage() {
       </div>
 
       {/* Panel derecho — formulario */}
-      <div style={{
-        width: '50%',
+      <div className="login-form-panel" style={{
         backgroundColor: '#f4f6fa',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '48px',
+        padding: '40px 24px',
       }}>
         <div style={{
           backgroundColor: 'white',

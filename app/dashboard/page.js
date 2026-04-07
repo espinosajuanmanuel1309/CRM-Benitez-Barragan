@@ -272,7 +272,7 @@ export default function DashboardPage() {
   if (cargando) return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6fa', colorScheme: 'light' }}>
       <Sidebar rol={rol} nombreUsuario={usuario?.nombre_completo} />
-      <div style={{ marginLeft: '240px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#6b7280' }}>Cargando dashboard...</p>
       </div>
     </div>
@@ -282,7 +282,7 @@ export default function DashboardPage() {
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6fa', colorScheme: 'light' }}>
       <Sidebar rol={rol} nombreUsuario={usuario?.nombre_completo} />
 
-      <div style={{ marginLeft: '240px', flex: 1, padding: '36px 40px' }}>
+      <div className="main-content" style={{ padding: '36px 40px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
           {/* Header */}
@@ -344,7 +344,7 @@ export default function DashboardPage() {
           {rol === 'admin' ? (
             <>
               {/* KPIs */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+              <div className="kpi-grid" style={{ gap: '16px', marginBottom: '28px' }}>
                 {[
                   { label: 'Horas del período', value: `${kpis.horasMes.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A', sub: variacionMes && !filtroFechaInicio ? `${parseFloat(variacionMes) >= 0 ? '↑' : '↓'} ${Math.abs(variacionMes)}% vs mes anterior` : null, subOk: parseFloat(variacionMes) >= 0 },
                   { label: 'Mes anterior', value: `${kpis.horasMesAnterior.toFixed(1)}h`, icon: '📅', bg: '#2E4A8C' },
@@ -395,7 +395,7 @@ export default function DashboardPage() {
               )}
 
               {/* Gráficas */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div className="charts-grid" style={{ gap: '20px', marginBottom: '20px' }}>
                 <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top 10 clientes</h3>
                   <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 16px' }}>Por horas registradas</p>

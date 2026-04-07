@@ -128,7 +128,7 @@ export default function RegistroPage() {
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6fa', colorScheme: 'light' }}>
       <Sidebar rol={rol} nombreUsuario={usuario?.nombre_completo} />
 
-      <div style={{ marginLeft: '240px', flex: 1, padding: '36px 40px' }}>
+      <div className="main-content" style={{ padding: '36px 40px' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
 
           <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1B2A4A', marginBottom: '24px', letterSpacing: '-0.5px' }}>
