@@ -132,7 +132,8 @@ export default function UsuariosPage() {
             <p style={{ color: '#6b7280' }}>Cargando usuarios...</p>
           ) : (
             <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '520px' }}>
                 <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                   <tr>
                     {['Nombre', 'Correo', 'Rol', 'Estado', 'Acciones'].map(h => (
@@ -167,6 +168,7 @@ export default function UsuariosPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>

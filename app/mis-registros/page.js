@@ -249,7 +249,8 @@ export default function MisRegistrosPage() {
           </div>
         ) : (
           <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
               <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <tr>
                   {['Fecha', 'Asociado', 'Cliente', 'Honorario', 'Actividad', 'Horas', 'Comentario', 'Acciones'].map(h => (
@@ -289,6 +290,7 @@ export default function MisRegistrosPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
