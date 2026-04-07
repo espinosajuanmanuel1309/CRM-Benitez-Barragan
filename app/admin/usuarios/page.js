@@ -15,6 +15,8 @@ export default function UsuariosPage() {
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
   const [verContrasena, setVerContrasena] = useState(false)
+  const [usuarioEditando, setUsuarioEditando] = useState(null)
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
   const router = useRouter()
   const { verificando } = useAdmin()
 
@@ -53,6 +55,34 @@ export default function UsuariosPage() {
   const handleToggleActivo = async (usuario) => {
     await supabase.from('usuarios').update({ activo: !usuario.activo }).eq('id', usuario.id)
     cargarUsuarios()
+  }
+
+  const handleAbrirEditar = (usuario) => {
+    if (usuarioEditando?.id === usuario.id) {
+      setUsuarioEditando(null)
+      return
+    }
+    setUsuarioEditando({ ...usuario })
+  }
+
+  const handleGuardarEdicion = async () => {
+    setGuardandoEdicion(true)
+    const { error: err } = await supabase
+      .from('usuarios')
+      .update({
+        nombre_completo: usuarioEditando.nombre_completo,
+        correo: usuarioEditando.correo,
+        rol: usuarioEditando.rol,
+      })
+      .eq('id', usuarioEditando.id)
+    if (err) {
+      setError('❌ Error al actualizar: ' + err.message)
+    } else {
+      setMensaje('✅ Usuario actualizado correctamente')
+      setUsuarioEditando(null)
+      cargarUsuarios()
+    }
+    setGuardandoEdicion(false)
   }
 
   const inputStyle = { width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', backgroundColor: 'white', color: '#1f2937', boxSizing: 'border-box' }
@@ -101,7 +131,7 @@ export default function UsuariosPage() {
                   <input type="email" name="correo" value={form.correo} onChange={handleChange} placeholder="nombre@benitezbarragan.com" style={inputStyle} required />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Contraseña temporal</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Contraseña</label>
                   <div style={{ position: 'relative' }}>
                     <input type={verContrasena ? 'text' : 'password'} name="contrasena" value={form.contrasena} onChange={handleChange} placeholder="Mínimo 6 caracteres" style={{ ...inputStyle, paddingRight: '36px' }} required />
                     <button type="button" onClick={() => setVerContrasena(v => !v)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', lineHeight: 1, padding: 0 }}>
@@ -142,29 +172,92 @@ export default function UsuariosPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.map((u, i) => (
-                    <tr key={u.id} style={{ borderTop: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151' }}>{u.nombre_completo}</td>
-                      <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151' }}>{u.correo}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '600', backgroundColor: u.rol === 'admin' ? '#f3e8ff' : '#f3f4f6', color: u.rol === 'admin' ? '#7c3aed' : '#374151' }}>
-                          {u.rol === 'admin' ? 'Admin' : 'Normal'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '600', backgroundColor: u.activo ? '#dcfce7' : '#fee2e2', color: u.activo ? '#16a34a' : '#dc2626' }}>
-                          {u.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <button
-                          onClick={() => handleToggleActivo(u)}
-                          style={{ fontSize: '12px', padding: '5px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: u.activo ? '#fef2f2' : '#f0fdf4', color: u.activo ? '#dc2626' : '#16a34a' }}
-                        >
-                          {u.activo ? 'Desactivar' : 'Activar'}
-                        </button>
-                      </td>
-                    </tr>
+                  {usuarios.map((u) => (
+                    <>
+                      <tr key={u.id} style={{ borderTop: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151' }}>{u.nombre_completo}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151' }}>{u.correo}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '600', backgroundColor: u.rol === 'admin' ? '#f3e8ff' : '#f3f4f6', color: u.rol === 'admin' ? '#7c3aed' : '#374151' }}>
+                            {u.rol === 'admin' ? 'Admin' : 'Normal'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '600', backgroundColor: u.activo ? '#dcfce7' : '#fee2e2', color: u.activo ? '#16a34a' : '#dc2626' }}>
+                            {u.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => handleAbrirEditar(u)}
+                              style={{ fontSize: '12px', padding: '5px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: usuarioEditando?.id === u.id ? '#1B2A4A' : '#eff6ff', color: usuarioEditando?.id === u.id ? 'white' : '#1d4ed8' }}
+                            >
+                              {usuarioEditando?.id === u.id ? 'Cerrar' : 'Editar'}
+                            </button>
+                            <button
+                              onClick={() => handleToggleActivo(u)}
+                              style={{ fontSize: '12px', padding: '5px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: u.activo ? '#fef2f2' : '#f0fdf4', color: u.activo ? '#dc2626' : '#16a34a' }}
+                            >
+                              {u.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {usuarioEditando?.id === u.id && (
+                        <tr key={`edit-${u.id}`}>
+                          <td colSpan={5} style={{ padding: '16px 20px', backgroundColor: '#eff6ff', borderLeft: '4px solid #1B2A4A', borderTop: '1px solid #bfdbfe' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Nombre completo</label>
+                                <input
+                                  type="text"
+                                  value={usuarioEditando.nombre_completo}
+                                  onChange={e => setUsuarioEditando({ ...usuarioEditando, nombre_completo: e.target.value })}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Correo</label>
+                                <input
+                                  type="email"
+                                  value={usuarioEditando.correo}
+                                  onChange={e => setUsuarioEditando({ ...usuarioEditando, correo: e.target.value })}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Rol</label>
+                                <select
+                                  value={usuarioEditando.rol}
+                                  onChange={e => setUsuarioEditando({ ...usuarioEditando, rol: e.target.value })}
+                                  style={inputStyle}
+                                >
+                                  <option value="normal">Normal</option>
+                                  <option value="admin">Administrador</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={handleGuardarEdicion}
+                                disabled={guardandoEdicion}
+                                style={{ backgroundColor: '#1B2A4A', color: 'white', border: 'none', borderRadius: '8px', padding: '7px 18px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: guardandoEdicion ? 0.5 : 1 }}
+                              >
+                                {guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
+                              </button>
+                              <button
+                                onClick={() => setUsuarioEditando(null)}
+                                style={{ backgroundColor: 'white', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', padding: '7px 18px', fontSize: '13px', cursor: 'pointer' }}
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
