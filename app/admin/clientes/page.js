@@ -34,7 +34,7 @@ export default function ClientesPage() {
   }
 
   const cargarPresupuestosCliente = async (clienteId) => {
-    const { data } = await supabase.from('presupuestos').select('*').eq('cliente_id', clienteId).eq('anio', 2026)
+    const { data } = await supabase.from('presupuestos').select('*').eq('cliente_id', clienteId).eq('anio', new Date().getFullYear())
     const mapa = {}
     data?.forEach(p => { mapa[p.honorario_id] = p.horas_mes })
     return mapa
@@ -63,9 +63,10 @@ export default function ClientesPage() {
   const handleGuardarEdicion = async () => {
     setGuardando(true)
     await supabase.from('clientes').update({ nombre: clienteEditando.nombre }).eq('id', clienteEditando.id)
-    await supabase.from('presupuestos').delete().eq('cliente_id', clienteEditando.id).eq('anio', 2026)
+    const anioActual = new Date().getFullYear()
+    await supabase.from('presupuestos').delete().eq('cliente_id', clienteEditando.id).eq('anio', anioActual)
     const presupuestosNuevos = Object.entries(honorariosSeleccionados).map(([honorarioId, horas]) => ({
-      cliente_id: clienteEditando.id, honorario_id: parseInt(honorarioId), horas_mes: horas, anio: 2026
+      cliente_id: clienteEditando.id, honorario_id: parseInt(honorarioId), horas_mes: horas, anio: anioActual
     }))
     if (presupuestosNuevos.length > 0) await supabase.from('presupuestos').insert(presupuestosNuevos)
     setMensaje('✅ Cliente actualizado')
@@ -80,7 +81,7 @@ export default function ClientesPage() {
     const { data, error } = await supabase.from('clientes').insert({ nombre: formNuevo.nombre, activo: true }).select().single()
     if (error) { setMensaje('❌ Error al agregar cliente'); setGuardando(false); return }
     const presupuestosNuevos = Object.entries(honorariosSeleccionados).map(([honorarioId, horas]) => ({
-      cliente_id: data.id, honorario_id: parseInt(honorarioId), horas_mes: horas, anio: 2026
+      cliente_id: data.id, honorario_id: parseInt(honorarioId), horas_mes: horas, anio: new Date().getFullYear()
     }))
     if (presupuestosNuevos.length > 0) await supabase.from('presupuestos').insert(presupuestosNuevos)
     setMensaje('✅ Cliente agregado correctamente')

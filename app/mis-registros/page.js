@@ -64,6 +64,7 @@ export default function MisRegistrosPage() {
 
   const inicializar = async () => {
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
     const { data: usuarioData } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
     setUsuarioActual(usuarioData)
     setRolUsuario(usuarioData?.rol || 'normal')

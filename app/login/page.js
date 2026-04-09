@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -11,6 +11,12 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) router.push('/dashboard')
+    })
+  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()

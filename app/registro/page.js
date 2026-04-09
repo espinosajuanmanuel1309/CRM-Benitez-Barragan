@@ -76,7 +76,8 @@ export default function RegistroPage() {
   }
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
   }
 
   const minutosOpciones = Array.from({ length: 12 }, (_, i) => i * 5)
