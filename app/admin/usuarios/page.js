@@ -35,9 +35,13 @@ export default function UsuariosPage() {
     setGuardando(true)
     setMensaje('')
     setError('')
+    const { data: { session } } = await supabase.auth.getSession()
     const response = await fetch('/api/crear-usuario', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
       body: JSON.stringify(form)
     })
     const data = await response.json()

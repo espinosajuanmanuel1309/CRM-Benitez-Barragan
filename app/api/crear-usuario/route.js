@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 const supabaseAdmin = createClient(
@@ -12,34 +10,20 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ROLES_VALIDOS = ['admin', 'normal']
 
 export async function POST(request) {
-  // 1. Verificar sesión activa leyendo las cookies del request
-  const cookieStore = await cookies()
+  // 1. Leer el token del header Authorization enviado por el cliente
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+  const token = authHeader.slice(7)
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  // 2. Validar el token contra Supabase Auth (verificación server-side real)
+  const { data: { user }, error: tokenError } = await supabaseAdmin.auth.getUser(token)
+  if (tokenError || !user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  // 2. Verificar que el usuario autenticado tiene rol admin en la BD
-  // Se usa supabaseAdmin para evitar dependencia de RLS durante la transición
+  // 3. Verificar que el usuario autenticado tiene rol admin en la BD
   const { data: usuarioActual } = await supabaseAdmin
     .from('usuarios')
     .select('rol')
@@ -50,7 +34,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
   }
 
-  // 3. Validar inputs en el servidor
+  // 4. Parsear y validar inputs
   let body
   try {
     body = await request.json()
@@ -76,7 +60,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'El rol especificado no es válido' }, { status: 400 })
   }
 
-  // 4. Crear el usuario en Supabase Auth
+  // 5. Crear el usuario en Supabase Auth
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email: correo.toLowerCase().trim(),
     password: contrasena,
@@ -94,7 +78,7 @@ export async function POST(request) {
     )
   }
 
-  // 5. Insertar en la tabla usuarios
+  // 6. Insertar en la tabla usuarios
   const { error: dbError } = await supabaseAdmin
     .from('usuarios')
     .insert({
