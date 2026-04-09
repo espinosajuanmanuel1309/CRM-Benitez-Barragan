@@ -28,7 +28,10 @@ export default function UsuariosPage() {
     setCargando(false)
   }
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+  }
 
   const handleGuardar = async (e) => {
     e.preventDefault()

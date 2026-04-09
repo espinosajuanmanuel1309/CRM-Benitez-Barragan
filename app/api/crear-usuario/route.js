@@ -78,16 +78,16 @@ export async function POST(request) {
     )
   }
 
-  // 6. Insertar en la tabla usuarios
+  // 6. Insertar en la tabla usuarios (upsert para sobrescribir si un trigger ya creó la fila)
   const { error: dbError } = await supabaseAdmin
     .from('usuarios')
-    .insert({
+    .upsert({
       id: authData.user.id,
       nombre_completo: nombre_completo.trim(),
       correo: correo.toLowerCase().trim(),
       rol,
       activo: true,
-    })
+    }, { onConflict: 'id' })
 
   if (dbError) {
     // Rollback: eliminar el usuario de Auth si falló la inserción en BD
