@@ -42,7 +42,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Cuerpo de la solicitud inválido' }, { status: 400 })
   }
 
-  const { nombre_completo, correo, contrasena, rol } = body
+  const { nombre_completo, correo, contrasena, rol, area } = body
 
   if (!nombre_completo || typeof nombre_completo !== 'string' || nombre_completo.trim().length < 2) {
     return NextResponse.json({ error: 'El nombre debe tener al menos 2 caracteres' }, { status: 400 })
@@ -86,6 +86,7 @@ export async function POST(request) {
       nombre_completo: nombre_completo.trim(),
       correo: correo.toLowerCase().trim(),
       rol,
+      area: area || null,
       activo: true,
     }, { onConflict: 'id' })
 

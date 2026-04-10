@@ -10,13 +10,14 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
   const [cargando, setCargando] = useState(true)
   const [mostrarForm, setMostrarForm] = useState(false)
-  const [form, setForm] = useState({ nombre_completo: '', correo: '', contrasena: '', rol: 'normal' })
+  const [form, setForm] = useState({ nombre_completo: '', correo: '', contrasena: '', rol: 'normal', area: '' })
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
   const [verContrasena, setVerContrasena] = useState(false)
   const [usuarioEditando, setUsuarioEditando] = useState(null)
   const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
   const router = useRouter()
   const { verificando } = useAdmin()
 
@@ -52,7 +53,7 @@ export default function UsuariosPage() {
       setError('❌ Error: ' + data.error)
     } else {
       setMensaje('✅ Usuario creado correctamente')
-      setForm({ nombre_completo: '', correo: '', contrasena: '', rol: 'normal' })
+      setForm({ nombre_completo: '', correo: '', contrasena: '', rol: 'normal', area: '' })
       setMostrarForm(false)
       cargarUsuarios()
     }
@@ -80,6 +81,7 @@ export default function UsuariosPage() {
         nombre_completo: usuarioEditando.nombre_completo,
         correo: usuarioEditando.correo,
         rol: usuarioEditando.rol,
+        area: usuarioEditando.area || null,
       })
       .eq('id', usuarioEditando.id)
     if (err) {
@@ -146,12 +148,23 @@ export default function UsuariosPage() {
                     </button>
                   </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Rol</label>
-                  <select name="rol" value={form.rol} onChange={handleChange} style={inputStyle}>
-                    <option value="normal">Normal</option>
-                    <option value="admin">Administrador</option>
-                  </select>
+                <div style={{ display: 'flex', gap: '14px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Rol</label>
+                    <select name="rol" value={form.rol} onChange={handleChange} style={inputStyle}>
+                      <option value="normal">Normal</option>
+                      <option value="admin">Administrador</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Área</label>
+                    <select name="area" value={form.area} onChange={handleChange} style={inputStyle}>
+                      <option value="">Sin área</option>
+                      <option value="legal">Legal</option>
+                      <option value="contable">Contable</option>
+                      <option value="administrativa">Administrativa</option>
+                    </select>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button type="submit" disabled={guardando} style={{ backgroundColor: '#1B2A4A', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '13px', cursor: 'pointer', opacity: guardando ? 0.5 : 1 }}>
@@ -168,22 +181,42 @@ export default function UsuariosPage() {
           {cargando ? (
             <p style={{ color: '#6b7280' }}>Cargando usuarios...</p>
           ) : (
+            <>
+              <div style={{ marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o correo..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '10px', padding: '9px 14px', fontSize: '14px', backgroundColor: 'white', color: '#1f2937', boxSizing: 'border-box', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+                />
+              </div>
             <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '520px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '620px' }}>
                 <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                   <tr>
-                    {['Nombre', 'Correo', 'Rol', 'Estado', 'Acciones'].map(h => (
+                    {['Nombre', 'Correo', 'Área', 'Rol', 'Estado', 'Acciones'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.map((u) => (
+                  {usuarios.filter(u =>
+                    u.nombre_completo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+                    u.correo?.toLowerCase().includes(busqueda.toLowerCase())
+                  ).map((u) => (
                     <>
                       <tr key={u.id} style={{ borderTop: '1px solid #f3f4f6' }}>
                         <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151' }}>{u.nombre_completo}</td>
                         <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151' }}>{u.correo}</td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {u.area ? (
+                            <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '600', backgroundColor: u.area === 'legal' ? '#eff6ff' : u.area === 'contable' ? '#f0fdf4' : '#faf5ff', color: u.area === 'legal' ? '#1d4ed8' : u.area === 'contable' ? '#16a34a' : '#7c3aed' }}>
+                              {u.area.charAt(0).toUpperCase() + u.area.slice(1)}
+                            </span>
+                          ) : <span style={{ color: '#9ca3af', fontSize: '12px' }}>—</span>}
+                        </td>
                         <td style={{ padding: '12px 16px' }}>
                           <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '600', backgroundColor: u.rol === 'admin' ? '#f3e8ff' : '#f3f4f6', color: u.rol === 'admin' ? '#7c3aed' : '#374151' }}>
                             {u.rol === 'admin' ? 'Admin' : 'Normal'}
@@ -214,8 +247,8 @@ export default function UsuariosPage() {
 
                       {usuarioEditando?.id === u.id && (
                         <tr key={`edit-${u.id}`}>
-                          <td colSpan={5} style={{ padding: '16px 20px', backgroundColor: '#eff6ff', borderLeft: '4px solid #1B2A4A', borderTop: '1px solid #bfdbfe' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '12px' }}>
+                          <td colSpan={6} style={{ padding: '16px 20px', backgroundColor: '#eff6ff', borderLeft: '4px solid #1B2A4A', borderTop: '1px solid #bfdbfe' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '12px' }}>
                               <div>
                                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Nombre completo</label>
                                 <input
@@ -245,6 +278,19 @@ export default function UsuariosPage() {
                                   <option value="admin">Administrador</option>
                                 </select>
                               </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '5px' }}>Área</label>
+                                <select
+                                  value={usuarioEditando.area || ''}
+                                  onChange={e => setUsuarioEditando({ ...usuarioEditando, area: e.target.value })}
+                                  style={inputStyle}
+                                >
+                                  <option value="">Sin área</option>
+                                  <option value="legal">Legal</option>
+                                  <option value="contable">Contable</option>
+                                  <option value="administrativa">Administrativa</option>
+                                </select>
+                              </div>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <button
@@ -270,6 +316,7 @@ export default function UsuariosPage() {
               </table>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>

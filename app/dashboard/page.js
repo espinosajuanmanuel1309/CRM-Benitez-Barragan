@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [horasPorCliente, setHorasPorCliente] = useState([])
   const [horasPorAsociado, setHorasPorAsociado] = useState([])
   const [horasPorHonorario, setHorasPorHonorario] = useState([])
+  const [horasPorArea, setHorasPorArea] = useState([])
   const [alertas, setAlertas] = useState([])
   const [misHoras, setMisHoras] = useState({ total: 0, porCliente: [] })
   const [clientes, setClientes] = useState([])
@@ -75,7 +76,7 @@ export default function DashboardPage() {
 
     let queryRegistros = supabase
       .from('registros')
-      .select('*, clientes(nombre), honorarios(nombre), usuarios(nombre_completo)')
+      .select('*, clientes(nombre), honorarios(nombre), usuarios(nombre_completo, area)')
       .gte('fecha_registro', fechaInicio)
       .lte('fecha_registro', fechaFin)
 
@@ -126,6 +127,17 @@ export default function DashboardPage() {
     setHorasPorAsociado(
       Object.entries(porAsociado)
         .map(([nombre, horas]) => ({ nombre, horas: parseFloat(horas.toFixed(2)) }))
+        .sort((a, b) => b.horas - a.horas)
+    )
+
+    const porArea = {}
+    registrosMes?.forEach(r => {
+      const area = r.usuarios?.area || 'sin área'
+      porArea[area] = (porArea[area] || 0) + r.horas + r.minutos / 60
+    })
+    setHorasPorArea(
+      Object.entries(porArea)
+        .map(([nombre, horas]) => ({ nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1), horas: parseFloat(horas.toFixed(2)) }))
         .sort((a, b) => b.horas - a.horas)
     )
 
@@ -459,6 +471,32 @@ export default function DashboardPage() {
                           </div>
                         )
                       })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Horas por área */}
+              <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Horas por área</h3>
+                <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 16px' }}>Distribución del trabajo por área del despacho</p>
+                <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                  {horasPorArea.length === 0 ? <p style={{ color: '#9ca3af', fontSize: '13px' }}>Sin datos para este período</p> : (
+                    <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={horasPorArea} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                          <XAxis dataKey="nombre" tick={{ fontSize: 13, fill: '#6b7280' }} />
+                          <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} />
+                          <Tooltip formatter={(v) => [`${v}h`, 'Horas']} contentStyle={{ fontSize: '13px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                          <Bar dataKey="horas" radius={[6, 6, 0, 0]}>
+                            {horasPorArea.map((entry, index) => {
+                              const color = entry.nombre.toLowerCase() === 'legal' ? '#1B2A4A' : entry.nombre.toLowerCase() === 'contable' ? '#16a34a' : entry.nombre.toLowerCase() === 'administrativa' ? '#7c3aed' : '#4A7CC9'
+                              return <Cell key={index} fill={color} />
+                            })}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   )}
                 </div>
