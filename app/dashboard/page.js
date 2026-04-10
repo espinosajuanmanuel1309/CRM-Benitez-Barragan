@@ -142,13 +142,15 @@ export default function DashboardPage() {
 
     const horasPorClienteCompleto = {}
     registrosMes?.forEach(r => {
-      horasPorClienteCompleto[r.cliente_id] = (horasPorClienteCompleto[r.cliente_id] || 0) + r.horas + r.minutos / 60
+      const clave = `${r.cliente_id}_${r.honorario_id}`
+      horasPorClienteCompleto[clave] = (horasPorClienteCompleto[clave] || 0) + r.horas + r.minutos / 60
     })
 
     const alertasData = []
     presupuestos?.forEach(p => {
       if (p.horas_mes > 0) {
-        const horasUsadas = horasPorClienteCompleto[p.cliente_id] || 0
+        const clave = `${p.cliente_id}_${p.honorario_id}`
+        const horasUsadas = horasPorClienteCompleto[clave] || 0
         const porcentaje = (horasUsadas / p.horas_mes) * 100
         if (porcentaje >= 80) {
           alertasData.push({
