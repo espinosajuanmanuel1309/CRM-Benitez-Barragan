@@ -199,16 +199,19 @@ export default function DashboardPage() {
 
     if (clienteIds.length > 0) {
       // Total despacho (todos los asociados) por cliente+honorario en el período
-      const { data: todosRegistros } = await supabase
-        .from('registros')
-        .select('cliente_id, honorario_id, horas, minutos')
-        .in('cliente_id', clienteIds)
-        .gte('fecha_registro', fechaInicio)
-        .lte('fecha_registro', fechaFin)
+      // Se usa API con service key para saltar RLS y obtener registros de todos los usuarios
+      const { data: { session } } = await supabase.auth.getSession()
+      const resDespacho = await fetch('/api/total-despacho', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ clienteIds, fechaInicio, fechaFin })
+      })
+      const { totalDespacho: tdMap } = await resDespacho.json()
 
-      todosRegistros?.forEach(r => {
-        if (porCliente[r.cliente_id]?.honorarios[r.honorario_id]) {
-          porCliente[r.cliente_id].honorarios[r.honorario_id].totalDespacho += r.horas + r.minutos / 60
+      Object.entries(tdMap || {}).forEach(([clave, horas]) => {
+        const [cId, hId] = clave.split('_').map(Number)
+        if (porCliente[cId]?.honorarios[hId]) {
+          porCliente[cId].honorarios[hId].totalDespacho = horas
         }
       })
 
