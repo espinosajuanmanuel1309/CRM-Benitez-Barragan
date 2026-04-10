@@ -95,7 +95,7 @@ export default function RegistroPage() {
       honorario_id: parseInt(form.honorario_id),
       actividad_id: parseInt(form.actividad_id),
       fecha_registro: form.fecha_registro,
-      horas: parseFloat(form.horas),
+      horas: parseInt(form.horas),
       minutos: parseInt(form.minutos),
       comentario: form.comentario
     })
@@ -230,19 +230,17 @@ export default function RegistroPage() {
                 </select>
               </div>
 
-              <div className="notranslate" translate="no" style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '16px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Horas</label>
                   <input
                     type="number"
                     name="horas"
                     value={form.horas}
-                    onChange={(e) => setForm(prev => ({ ...prev, horas: e.currentTarget.value }))}
+                    onChange={handleChange}
                     min="0"
                     max="24"
                     required
-                    translate="no"
-                    className="notranslate"
                     style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '9px 12px', fontSize: '14px', backgroundColor: 'white', color: '#1f2937', boxSizing: 'border-box' }}
                   />
                 </div>
@@ -252,8 +250,6 @@ export default function RegistroPage() {
                     name="minutos"
                     value={form.minutos}
                     onChange={handleChange}
-                    translate="no"
-                    className="notranslate"
                     style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '9px 12px', fontSize: '14px', backgroundColor: 'white', color: '#1f2937', boxSizing: 'border-box' }}
                   >
                     {minutosOpciones.map(m => (
@@ -263,9 +259,9 @@ export default function RegistroPage() {
                 </div>
               </div>
 
-              {(parseFloat(form.horas) > 0 || parseFloat(form.minutos) > 0) && (
-                <p className="notranslate" translate="no" style={{ fontSize: '13px', fontWeight: '600', color: '#1B2A4A' }}>
-                  Total: {(parseFloat(form.horas) + parseFloat(form.minutos) / 60).toFixed(2).replace(',', '.')} horas
+              {(parseInt(form.horas) > 0 || parseInt(form.minutos) > 0) && (
+                <p style={{ fontSize: '13px', fontWeight: '600', color: '#1B2A4A' }}>
+                  Total: {(parseInt(form.horas) + parseInt(form.minutos) / 60).toFixed(2)} horas
                 </p>
               )}
 
