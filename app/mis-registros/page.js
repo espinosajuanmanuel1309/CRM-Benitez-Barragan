@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
@@ -32,6 +32,7 @@ export default function MisRegistrosPage() {
   const [busquedaClienteEditar, setBusquedaClienteEditar] = useState('')
   const [mostrarListaClientesEditar, setMostrarListaClientesEditar] = useState(false)
   const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+  const skipEffects = useRef(false)
 
   const router = useRouter()
 
@@ -42,6 +43,7 @@ export default function MisRegistrosPage() {
   // Cargar honorarios cuando cambia cliente en el modal
   useEffect(() => {
     if (!formEditar.cliente_id) return
+    if (skipEffects.current) return
     const cargar = async () => {
       const { data } = await supabase
         .from('presupuestos')
@@ -57,6 +59,7 @@ export default function MisRegistrosPage() {
   // Filtrar actividades cuando cambia honorario en el modal
   useEffect(() => {
     if (!formEditar.honorario_id) return
+    if (skipEffects.current) return
     const filtradas = actividadesAll.filter(a => a.honorario_id === parseInt(formEditar.honorario_id))
     setActividadesEditar(filtradas)
     setFormEditar(f => ({ ...f, actividad_id: '' }))
@@ -127,6 +130,7 @@ export default function MisRegistrosPage() {
     setActividadesEditar(filtradas)
 
     setBusquedaClienteEditar(r.clientes?.nombre || '')
+    skipEffects.current = true
     setFormEditar({
       cliente_id: r.cliente_id,
       honorario_id: r.honorario_id,
@@ -137,6 +141,7 @@ export default function MisRegistrosPage() {
       comentario: r.comentario || ''
     })
     setRegistroEditando(r)
+    setTimeout(() => { skipEffects.current = false }, 0)
   }
 
   const handleGuardarEdicion = async () => {
