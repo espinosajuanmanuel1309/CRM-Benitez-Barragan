@@ -95,7 +95,7 @@ export default function RegistroPage() {
       honorario_id: parseInt(form.honorario_id),
       actividad_id: parseInt(form.actividad_id),
       fecha_registro: form.fecha_registro,
-      horas: parseInt(form.horas),
+      horas: parseFloat(form.horas),
       minutos: parseInt(form.minutos),
       comentario: form.comentario
     })
@@ -259,9 +259,9 @@ export default function RegistroPage() {
                 </div>
               </div>
 
-              {(parseInt(form.horas) > 0 || parseInt(form.minutos) > 0) && (
+              {(parseFloat(form.horas) > 0 || parseFloat(form.minutos) > 0) && (
                 <p style={{ fontSize: '13px', fontWeight: '600', color: '#1B2A4A' }}>
-                  Total: {(parseInt(form.horas) + parseInt(form.minutos) / 60).toFixed(2)} horas
+                  Total: {(parseFloat(form.horas) + parseFloat(form.minutos) / 60).toFixed(2).replace(',', '.')} horas
                 </p>
               )}
 
