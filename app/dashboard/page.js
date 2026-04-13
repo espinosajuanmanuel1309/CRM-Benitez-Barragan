@@ -491,8 +491,8 @@ export default function DashboardPage() {
                           <Tooltip formatter={(v) => [`${v}h`, 'Horas']} contentStyle={{ fontSize: '13px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
                           <Bar dataKey="horas" radius={[6, 6, 0, 0]}>
                             {horasPorArea.map((entry, index) => {
-                              const color = entry.nombre.toLowerCase() === 'legal' ? '#1B2A4A' : entry.nombre.toLowerCase() === 'contable' ? '#16a34a' : entry.nombre.toLowerCase() === 'administrativa' ? '#7c3aed' : '#4A7CC9'
-                              return <Cell key={index} fill={color} />
+                              const blueScale = ['#1B2A4A', '#2563eb', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe']
+                              return <Cell key={index} fill={blueScale[index % blueScale.length]} />
                             })}
                           </Bar>
                         </BarChart>
