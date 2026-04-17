@@ -190,13 +190,13 @@ export default function PresupuestosPage() {
                 disabled={importando}
                 style={{
                   fontSize: '13px', fontWeight: '600',
-                  backgroundColor: 'white', color: '#1B2A4A',
+                  backgroundColor: '#16a34a', color: 'white',
                   padding: '7px 16px', borderRadius: '8px',
-                  border: '1.5px solid #1B2A4A', cursor: importando ? 'not-allowed' : 'pointer',
+                  border: 'none', cursor: importando ? 'not-allowed' : 'pointer',
                   opacity: importando ? 0.6 : 1
                 }}
               >
-                {importando ? 'Importando...' : 'Importar Excel/CSV'}
+                {importando ? 'Importando...' : 'Importar Excel / CSV'}
               </button>
               <select
                 value={anio}
