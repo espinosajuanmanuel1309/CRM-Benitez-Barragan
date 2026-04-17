@@ -1,10 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useAdmin } from '../../lib/useAdmin'
 import Sidebar from '../../lib/Navbar'
+
+function normalizar(str) {
+  if (!str) return ''
+  return str
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.,;:'"!?¿¡()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 export default function PresupuestosPage() {
   const [clientes, setClientes] = useState([])
@@ -17,6 +30,9 @@ export default function PresupuestosPage() {
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
+  const [importando, setImportando] = useState(false)
+  const [resumenImport, setResumenImport] = useState(null)
+  const fileInputRef = useRef(null)
   const router = useRouter()
   const { verificando } = useAdmin()
 
@@ -57,6 +73,97 @@ export default function PresupuestosPage() {
     setGuardando(false)
   }
 
+  const handleImportar = async (e) => {
+    const file = e.target.files[0]
+    if (!fileInputRef.current) return
+    fileInputRef.current.value = ''
+    if (!file) return
+
+    setImportando(true)
+    setResumenImport(null)
+    setMensaje('')
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+      if (rows.length < 2) {
+        setMensaje('❌ El archivo no contiene datos')
+        setImportando(false)
+        return
+      }
+
+      const encabezados = rows[0].map(h => h?.toString().trim())
+      const colHoras = encabezados[2] || ''
+      const matchAnio = colHoras.match(/\d{4}/)
+      const anioArchivo = matchAnio ? parseInt(matchAnio[0]) : anioActual
+
+      let importados = 0
+      const clientesNoEncontrados = []
+      const honorariosNoEncontrados = []
+
+      for (let i = 1; i < rows.length; i++) {
+        const fila = rows[i]
+        const nombreCliente = fila[0]?.toString().trim()
+        const nombreHonorario = fila[1]?.toString().trim()
+        const horasRaw = fila[2]
+
+        if (!nombreCliente && !nombreHonorario) continue
+
+        const horas = parseFloat(horasRaw) || 0
+
+        const clienteMatch = clientes.find(c => normalizar(c.nombre) === normalizar(nombreCliente))
+        if (!clienteMatch) {
+          if (nombreCliente && !clientesNoEncontrados.includes(nombreCliente))
+            clientesNoEncontrados.push(nombreCliente)
+          continue
+        }
+
+        const honorarioMatch = honorarios.find(h => normalizar(h.nombre) === normalizar(nombreHonorario))
+        if (!honorarioMatch) {
+          if (nombreHonorario && !honorariosNoEncontrados.includes(nombreHonorario))
+            honorariosNoEncontrados.push(nombreHonorario)
+          continue
+        }
+
+        const { data: existente } = await supabase
+          .from('presupuestos')
+          .select('id')
+          .eq('cliente_id', clienteMatch.id)
+          .eq('honorario_id', honorarioMatch.id)
+          .eq('anio', anioArchivo)
+          .maybeSingle()
+
+        if (existente) {
+          await supabase.from('presupuestos').update({ horas_mes: horas }).eq('id', existente.id)
+        } else {
+          await supabase.from('presupuestos').insert({
+            cliente_id: clienteMatch.id,
+            honorario_id: honorarioMatch.id,
+            horas_mes: horas,
+            anio: anioArchivo
+          })
+        }
+        importados++
+      }
+
+      if (clienteSeleccionado) cargarPresupuestos()
+
+      setResumenImport({
+        anio: anioArchivo,
+        importados,
+        clientesNoEncontrados,
+        honorariosNoEncontrados
+      })
+    } catch (err) {
+      setMensaje('❌ Error al leer el archivo. Verifica que sea un Excel o CSV válido.')
+    }
+
+    setImportando(false)
+  }
+
   const clientesFiltrados = clientes.filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase()))
 
   if (verificando) return null
@@ -70,20 +177,78 @@ export default function PresupuestosPage() {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1B2A4A', margin: 0, letterSpacing: '-0.5px' }}>Presupuestos por Cliente</h1>
-            <select
-              value={anio}
-              onChange={e => setAnio(parseInt(e.target.value))}
-              style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: 'white', color: '#1f2937' }}
-            >
-              {Array.from({ length: 5 }, (_, i) => anioActual - 2 + i).map(a => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                style={{ display: 'none' }}
+                onChange={handleImportar}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importando}
+                style={{
+                  fontSize: '13px', fontWeight: '600',
+                  backgroundColor: 'white', color: '#1B2A4A',
+                  padding: '7px 16px', borderRadius: '8px',
+                  border: '1.5px solid #1B2A4A', cursor: importando ? 'not-allowed' : 'pointer',
+                  opacity: importando ? 0.6 : 1
+                }}
+              >
+                {importando ? 'Importando...' : 'Importar Excel/CSV'}
+              </button>
+              <select
+                value={anio}
+                onChange={e => setAnio(parseInt(e.target.value))}
+                style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: 'white', color: '#1f2937' }}
+              >
+                {Array.from({ length: 5 }, (_, i) => anioActual - 2 + i).map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {mensaje && (
             <div style={{ marginBottom: '16px', padding: '12px 16px', borderRadius: '8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', fontSize: '13px' }}>
               {mensaje}
+            </div>
+          )}
+
+          {resumenImport && (
+            <div style={{ marginBottom: '20px', padding: '16px 20px', borderRadius: '12px', backgroundColor: 'white', border: '1px solid #d1d5db', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: '#1B2A4A' }}>Resultado de importación — {resumenImport.anio}</span>
+                <button onClick={() => setResumenImport(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', lineHeight: 1 }}>✕</button>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', color: '#15803d', backgroundColor: '#f0fdf4', padding: '4px 12px', borderRadius: '99px', fontWeight: '600' }}>
+                  ✅ {resumenImport.importados} registros importados
+                </span>
+                {resumenImport.clientesNoEncontrados.length > 0 && (
+                  <span style={{ fontSize: '13px', color: '#b45309', backgroundColor: '#fffbeb', padding: '4px 12px', borderRadius: '99px', fontWeight: '600' }}>
+                    ⚠️ {resumenImport.clientesNoEncontrados.length} cliente{resumenImport.clientesNoEncontrados.length > 1 ? 's' : ''} no encontrado{resumenImport.clientesNoEncontrados.length > 1 ? 's' : ''}
+                  </span>
+                )}
+                {resumenImport.honorariosNoEncontrados.length > 0 && (
+                  <span style={{ fontSize: '13px', color: '#b45309', backgroundColor: '#fffbeb', padding: '4px 12px', borderRadius: '99px', fontWeight: '600' }}>
+                    ⚠️ {resumenImport.honorariosNoEncontrados.length} honorario{resumenImport.honorariosNoEncontrados.length > 1 ? 's' : ''} no encontrado{resumenImport.honorariosNoEncontrados.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              {resumenImport.clientesNoEncontrados.length > 0 && (
+                <div style={{ marginTop: '10px' }}>
+                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px', fontWeight: '600' }}>Clientes no encontrados:</p>
+                  <p style={{ fontSize: '12px', color: '#374151', margin: 0 }}>{resumenImport.clientesNoEncontrados.join(', ')}</p>
+                </div>
+              )}
+              {resumenImport.honorariosNoEncontrados.length > 0 && (
+                <div style={{ marginTop: '8px' }}>
+                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px', fontWeight: '600' }}>Honorarios no encontrados:</p>
+                  <p style={{ fontSize: '12px', color: '#374151', margin: 0 }}>{resumenImport.honorariosNoEncontrados.join(', ')}</p>
+                </div>
+              )}
             </div>
           )}
 
