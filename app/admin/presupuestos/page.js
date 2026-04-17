@@ -12,7 +12,8 @@ export default function PresupuestosPage() {
   const [presupuestos, setPresupuestos] = useState([])
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
   const [busqueda, setBusqueda] = useState('')
-  const [anio, setAnio] = useState(2026)
+  const anioActual = new Date().getFullYear()
+  const [anio, setAnio] = useState(anioActual)
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
@@ -74,9 +75,9 @@ export default function PresupuestosPage() {
               onChange={e => setAnio(parseInt(e.target.value))}
               style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: 'white', color: '#1f2937' }}
             >
-              <option value={2025}>2025</option>
-              <option value={2026}>2026</option>
-              <option value={2027}>2027</option>
+              {Array.from({ length: 5 }, (_, i) => anioActual - 2 + i).map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
             </select>
           </div>
 
