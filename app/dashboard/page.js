@@ -561,9 +561,9 @@ export default function DashboardPage() {
                 {misHoras.porCliente.length === 0 ? (
                   <p style={{ color: '#6b7280', fontSize: '13px', padding: '24px' }}>No hay registros en este período.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px 24px 24px' }}>
                     {misHoras.porCliente.map((c, i) => (
-                      <div key={i} style={{ padding: '20px 24px', borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                      <div key={i} style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '16px 20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                           <span style={{ fontSize: '14px', fontWeight: '700', color: '#1B2A4A' }}>{c.nombre}</span>
                           <span style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A' }}>{c.misHoras}h mis horas</span>
