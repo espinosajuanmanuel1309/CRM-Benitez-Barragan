@@ -21,8 +21,6 @@ export default function ClientesPage() {
   const router = useRouter()
   const { verificando } = useAdmin()
 
-  useEffect(() => { cargarDatos() }, [])
-
   const cargarDatos = async () => {
     const [{ data: clientesData }, { data: honorariosData }] = await Promise.all([
       supabase.from('clientes').select('*').order('nombre'),
@@ -32,6 +30,8 @@ export default function ClientesPage() {
     setHonorarios(honorariosData || [])
     setCargando(false)
   }
+
+  useEffect(() => { cargarDatos() }, []) // eslint-disable-line react-hooks/set-state-in-effect
 
   const cargarPresupuestosCliente = async (clienteId) => {
     const { data } = await supabase.from('presupuestos').select('*').eq('cliente_id', clienteId).eq('anio', new Date().getFullYear())
@@ -161,6 +161,7 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Honorarios activos y horas mensuales</label>
+                  {/* eslint-disable-next-line react-hooks/static-components */}
                   <FormHonorarios />
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>

@@ -27,10 +27,6 @@ export default function RegistroPage() {
   const [exito, setExito] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    inicializar()
-  }, [])
-
   const inicializar = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -39,6 +35,11 @@ export default function RegistroPage() {
     setRol(usuarioData?.rol || 'normal')
     cargarDatos()
   }
+
+  useEffect(() => {
+    inicializar()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (form.cliente_id) {

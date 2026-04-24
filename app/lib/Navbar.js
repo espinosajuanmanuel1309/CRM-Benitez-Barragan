@@ -18,6 +18,7 @@ export default function Sidebar({ rol, nombreUsuario }) {
       supabase.from('usuarios').select('nombre_completo').eq('id', user.id).single()
         .then(({ data }) => { if (data) setNombre(data.nombre_completo) })
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Cerrar sidebar al cambiar de ruta (móvil)

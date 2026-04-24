@@ -22,12 +22,12 @@ export default function ClienteDetallePage() {
 
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
-  useEffect(() => { cargarClientes() }, [])
-
   const cargarClientes = async () => {
     const { data } = await supabase.from('clientes').select('*').eq('activo', true).order('nombre')
     setClientes(data || [])
   }
+
+  useEffect(() => { cargarClientes() }, []) // eslint-disable-line react-hooks/set-state-in-effect
 
   const cargarDetalle = async (clienteId, mesNum, anioNum) => {
     setCargando(true)

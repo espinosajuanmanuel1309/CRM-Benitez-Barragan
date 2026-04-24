@@ -20,8 +20,6 @@ export default function HonorariosPage() {
   const router = useRouter()
   const { verificando } = useAdmin()
 
-  useEffect(() => { cargarDatos() }, [])
-
   const cargarDatos = async () => {
     const [{ data: honorariosData }, { data: actividadesData }] = await Promise.all([
       supabase.from('honorarios').select('*').order('nombre'),
@@ -31,6 +29,8 @@ export default function HonorariosPage() {
     setActividades(actividadesData || [])
     setCargando(false)
   }
+
+  useEffect(() => { cargarDatos() }, []) // eslint-disable-line react-hooks/set-state-in-effect
 
   const handleGuardarHonorario = async (e) => {
     e.preventDefault()

@@ -21,13 +21,13 @@ export default function UsuariosPage() {
   const router = useRouter()
   const { verificando } = useAdmin()
 
-  useEffect(() => { cargarUsuarios() }, [])
-
   const cargarUsuarios = async () => {
     const { data } = await supabase.from('usuarios').select('*').order('nombre_completo')
     setUsuarios(data || [])
     setCargando(false)
   }
+
+  useEffect(() => { cargarUsuarios() }, []) // eslint-disable-line react-hooks/set-state-in-effect
 
   const handleChange = (e) => {
     const { name, value } = e.target

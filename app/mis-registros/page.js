@@ -38,8 +38,26 @@ export default function MisRegistrosPage() {
 
   const router = useRouter()
 
+  const inicializar = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+    const { data: usuarioData } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
+    setUsuarioActual(usuarioData)
+    setRolUsuario(usuarioData?.rol || 'normal')
+    const [{ data: clientesData }, { data: usuariosData }, { data: actividadesData }] = await Promise.all([
+      supabase.from('clientes').select('*').eq('activo', true).order('nombre'),
+      supabase.from('usuarios').select('*').eq('activo', true).order('nombre_completo'),
+      supabase.from('actividades').select('*').eq('activo', true).order('nombre'),
+    ])
+    setClientes(clientesData || [])
+    setUsuarios(usuariosData || [])
+    setActividadesAll(actividadesData || [])
+    await cargarRegistros(usuarioData, { fechaInicio: primerDiaMes, fechaFin: ultimoDiaMes })
+  }
+
   useEffect(() => {
     inicializar()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Cargar honorarios cuando cambia cliente en el modal
@@ -65,24 +83,7 @@ export default function MisRegistrosPage() {
     const filtradas = actividadesAll.filter(a => a.honorario_id === parseInt(formEditar.honorario_id))
     setActividadesEditar(filtradas)
     setFormEditar(f => ({ ...f, actividad_id: '' }))
-  }, [formEditar.honorario_id])
-
-  const inicializar = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    const { data: usuarioData } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
-    setUsuarioActual(usuarioData)
-    setRolUsuario(usuarioData?.rol || 'normal')
-    const [{ data: clientesData }, { data: usuariosData }, { data: actividadesData }] = await Promise.all([
-      supabase.from('clientes').select('*').eq('activo', true).order('nombre'),
-      supabase.from('usuarios').select('*').eq('activo', true).order('nombre_completo'),
-      supabase.from('actividades').select('*').eq('activo', true).order('nombre'),
-    ])
-    setClientes(clientesData || [])
-    setUsuarios(usuariosData || [])
-    setActividadesAll(actividadesData || [])
-    await cargarRegistros(usuarioData, { fechaInicio: primerDiaMes, fechaFin: ultimoDiaMes })
-  }
+  }, [formEditar.honorario_id, actividadesAll])
 
   const cargarRegistros = async (usuarioData = usuarioActual, filtros = {}) => {
     setCargando(true)

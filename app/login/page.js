@@ -16,6 +16,7 @@ export default function LoginPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) router.push('/dashboard')
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleLogin = async (e) => {

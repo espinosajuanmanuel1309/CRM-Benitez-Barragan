@@ -36,9 +36,6 @@ export default function PresupuestosPage() {
   const router = useRouter()
   const { verificando } = useAdmin()
 
-  useEffect(() => { cargarDatos() }, [])
-  useEffect(() => { if (clienteSeleccionado) cargarPresupuestos() }, [clienteSeleccionado, anio])
-
   const cargarDatos = async () => {
     const [{ data: clientesData }, { data: honorariosData }] = await Promise.all([
       supabase.from('clientes').select('*').eq('activo', true).order('nombre'),
@@ -53,6 +50,10 @@ export default function PresupuestosPage() {
     const { data } = await supabase.from('presupuestos').select('*').eq('cliente_id', clienteSeleccionado.id).eq('anio', anio)
     setPresupuestos(data || [])
   }
+
+  useEffect(() => { cargarDatos() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (clienteSeleccionado) cargarPresupuestos() }, [clienteSeleccionado, anio])
 
   const getHoras = (honorario_id) => {
     const p = presupuestos.find(p => p.honorario_id === honorario_id)

@@ -38,10 +38,6 @@ export default function DashboardPage() {
   const primerDiaMesAnterior = `${anioMesAnterior}-${String(mesAnterior).padStart(2, '0')}-01`
   const ultimoDiaMesAnterior = new Date(anioMesAnterior, mesAnterior, 0).toISOString().split('T')[0]
 
-  useEffect(() => {
-    inicializar()
-  }, [])
-
   const inicializar = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
@@ -70,6 +66,11 @@ export default function DashboardPage() {
     }
     setCargando(false)
   }
+
+  useEffect(() => {
+    inicializar()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const cargarDatosAdmin = async (filtros = {}) => {
     setCargando(true)

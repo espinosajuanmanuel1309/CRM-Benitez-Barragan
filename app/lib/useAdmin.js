@@ -28,6 +28,7 @@ export function useAdmin() {
       setVerificando(false)
     }
     verificar()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return { verificando, esAdmin }
