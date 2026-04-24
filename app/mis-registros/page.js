@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import Sidebar from '../lib/Navbar'
 
+const REGISTROS_PAGE_SIZE = 1000
+
 export default function MisRegistrosPage() {
   const [registros, setRegistros] = useState([])
   const [clientes, setClientes] = useState([])
@@ -86,17 +88,33 @@ export default function MisRegistrosPage() {
     setCargando(true)
     const rol = usuarioData?.rol || rolUsuario
     const userId = usuarioData?.id
-    let query = supabase
-      .from('registros')
-      .select(`*, clientes(nombre), honorarios(nombre), actividades(nombre), usuarios(nombre_completo)`)
-      .order('fecha_registro', { ascending: false })
-    if (rol === 'normal') query = query.eq('usuario_id', userId)
-    if (filtros.fechaInicio) query = query.gte('fecha_registro', filtros.fechaInicio)
-    if (filtros.fechaFin) query = query.lte('fecha_registro', filtros.fechaFin)
-    if (filtros.filtroCliente) query = query.eq('cliente_id', parseInt(filtros.filtroCliente))
-    if (filtros.filtroUsuario && rol === 'admin') query = query.eq('usuario_id', filtros.filtroUsuario)
-    const { data } = await query
-    setRegistros(data || [])
+    const todos = []
+
+    for (let from = 0; ; from += REGISTROS_PAGE_SIZE) {
+      let query = supabase
+        .from('registros')
+        .select(`*, clientes(nombre), honorarios(nombre), actividades(nombre), usuarios(nombre_completo)`)
+        .order('fecha_registro', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, from + REGISTROS_PAGE_SIZE - 1)
+
+      if (rol === 'normal') query = query.eq('usuario_id', userId)
+      if (filtros.fechaInicio) query = query.gte('fecha_registro', filtros.fechaInicio)
+      if (filtros.fechaFin) query = query.lte('fecha_registro', filtros.fechaFin)
+      if (filtros.filtroCliente) query = query.eq('cliente_id', parseInt(filtros.filtroCliente))
+      if (filtros.filtroUsuario && rol === 'admin') query = query.eq('usuario_id', filtros.filtroUsuario)
+
+      const { data, error } = await query
+      if (error) {
+        console.error(error)
+        break
+      }
+
+      todos.push(...(data || []))
+      if (!data || data.length < REGISTROS_PAGE_SIZE) break
+    }
+
+    setRegistros(todos)
     setCargando(false)
   }
 
