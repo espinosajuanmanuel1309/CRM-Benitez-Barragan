@@ -85,18 +85,27 @@ export default function DashboardPage() {
 
     const anioFiltro = parseInt(fechaInicio.split('-')[0])
 
+    let queryRegistrosAnio = supabase
+      .from('registros')
+      .select('horas, minutos, cliente_id, honorario_id')
+      .gte('fecha_registro', `${anioFiltro}-01-01`)
+      .lte('fecha_registro', `${anioFiltro}-12-31`)
+    if (filtros.cliente) queryRegistrosAnio = queryRegistrosAnio.eq('cliente_id', parseInt(filtros.cliente))
+
     const [
       { data: registrosMes },
       { data: registrosMesAnterior },
       { data: clientesData },
       { data: usuariosData },
-      { data: presupuestos }
+      { data: presupuestos },
+      { data: registrosAnio }
     ] = await Promise.all([
       queryRegistros,
       supabase.from('registros').select('horas, minutos').gte('fecha_registro', primerDiaMesAnterior).lte('fecha_registro', ultimoDiaMesAnterior),
       supabase.from('clientes').select('*').eq('activo', true),
       supabase.from('usuarios').select('*').eq('activo', true),
-      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioFiltro)
+      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioFiltro),
+      queryRegistrosAnio
     ])
 
     const totalHorasMes = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
@@ -155,7 +164,7 @@ export default function DashboardPage() {
     )
 
     const horasPorClienteCompleto = {}
-    registrosMes?.forEach(r => {
+    registrosAnio?.forEach(r => {
       const clave = `${r.cliente_id}_${r.honorario_id}`
       horasPorClienteCompleto[clave] = (horasPorClienteCompleto[clave] || 0) + r.horas + r.minutos / 60
     })
