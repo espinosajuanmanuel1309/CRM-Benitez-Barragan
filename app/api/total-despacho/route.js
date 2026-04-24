@@ -6,6 +6,31 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+const PAGE_SIZE = 1000
+
+async function cargarRegistros({ clienteIds, fechaInicio, fechaFin }) {
+  const registros = []
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabaseAdmin
+      .from('registros')
+      .select('cliente_id, honorario_id, horas, minutos')
+      .in('cliente_id', clienteIds)
+      .gte('fecha_registro', fechaInicio)
+      .lte('fecha_registro', fechaFin)
+      .order('fecha_registro', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error) return { registros: [], error }
+
+    registros.push(...(data || []))
+    if (!data || data.length < PAGE_SIZE) break
+  }
+
+  return { registros, error: null }
+}
+
 export async function POST(request) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -30,12 +55,7 @@ export async function POST(request) {
     return NextResponse.json({ totalDespacho: {} })
   }
 
-  const { data: registros, error } = await supabaseAdmin
-    .from('registros')
-    .select('cliente_id, honorario_id, horas, minutos')
-    .in('cliente_id', clienteIds)
-    .gte('fecha_registro', fechaInicio)
-    .lte('fecha_registro', fechaFin)
+  const { registros, error } = await cargarRegistros({ clienteIds, fechaInicio, fechaFin })
 
   if (error) {
     return NextResponse.json({ error: 'Error al consultar registros' }, { status: 500 })

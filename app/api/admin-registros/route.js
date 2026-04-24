@@ -6,6 +6,34 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+const PAGE_SIZE = 1000
+
+async function cargarRegistros({ fechaInicio, fechaFin, clienteId, asociadoId }) {
+  const registros = []
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = supabaseAdmin
+      .from('registros')
+      .select('*, clientes(nombre), honorarios(nombre), usuarios(nombre_completo, area)')
+      .gte('fecha_registro', fechaInicio)
+      .lte('fecha_registro', fechaFin)
+      .order('fecha_registro', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (clienteId) query = query.eq('cliente_id', clienteId)
+    if (asociadoId) query = query.eq('usuario_id', asociadoId)
+
+    const { data, error } = await query
+    if (error) return { registros: [], error }
+
+    registros.push(...(data || []))
+    if (!data || data.length < PAGE_SIZE) break
+  }
+
+  return { registros, error: null }
+}
+
 export async function POST(request) {
   const authHeader = request.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) {
@@ -37,16 +65,7 @@ export async function POST(request) {
 
   const { fechaInicio, fechaFin, clienteId, asociadoId } = body
 
-  let query = supabaseAdmin
-    .from('registros')
-    .select('*, clientes(nombre), honorarios(nombre), usuarios(nombre_completo, area)')
-    .gte('fecha_registro', fechaInicio)
-    .lte('fecha_registro', fechaFin)
-
-  if (clienteId) query = query.eq('cliente_id', clienteId)
-  if (asociadoId) query = query.eq('usuario_id', asociadoId)
-
-  const { data: registros, error } = await query
+  const { registros, error } = await cargarRegistros({ fechaInicio, fechaFin, clienteId, asociadoId })
   if (error) {
     return NextResponse.json({ error: 'Error al consultar registros' }, { status: 500 })
   }

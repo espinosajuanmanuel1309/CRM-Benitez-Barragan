@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Sidebar from '../lib/Navbar'
 
+const REGISTROS_PAGE_SIZE = 1000
+
 export default function DashboardPage() {
   const [usuario, setUsuario] = useState(null)
   const [rol, setRol] = useState('')
@@ -76,32 +78,42 @@ export default function DashboardPage() {
     const anioFiltro = parseInt(fechaInicio.split('-')[0])
 
     const { data: { session } } = await supabase.auth.getSession()
-    const resRegistros = await fetch('/api/admin-registros', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({
-        fechaInicio,
-        fechaFin,
-        clienteId: filtros.cliente ? parseInt(filtros.cliente) : null,
-        asociadoId: filtros.asociado || null
+    const cargarRegistrosAdmin = async (params) => {
+      const response = await fetch('/api/admin-registros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify(params)
       })
+      const data = await response.json()
+      return data.registros || []
+    }
+
+    const registrosMes = await cargarRegistrosAdmin({
+      fechaInicio,
+      fechaFin,
+      clienteId: filtros.cliente ? parseInt(filtros.cliente) : null,
+      asociadoId: filtros.asociado || null
     })
-    const { registros: registrosMes } = await resRegistros.json()
+
+    const registrosMesAnterior = await cargarRegistrosAdmin({
+      fechaInicio: primerDiaMesAnterior,
+      fechaFin: ultimoDiaMesAnterior,
+      clienteId: null,
+      asociadoId: null
+    })
 
     const [
-      { data: registrosMesAnterior },
       { data: clientesData },
       { data: usuariosData },
       { data: presupuestos }
     ] = await Promise.all([
-      supabase.from('registros').select('horas, minutos').gte('fecha_registro', primerDiaMesAnterior).lte('fecha_registro', ultimoDiaMesAnterior),
       supabase.from('clientes').select('*').eq('activo', true),
       supabase.from('usuarios').select('*').eq('activo', true),
       supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioFiltro)
     ])
 
-    const totalHorasMes = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
-    const totalHorasMesAnterior = registrosMesAnterior?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
+    const totalHorasMes = registrosMes.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0)
+    const totalHorasMesAnterior = registrosMesAnterior.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0)
 
     setKpis({
       horasMes: totalHorasMes,
@@ -111,7 +123,7 @@ export default function DashboardPage() {
     })
 
     const porCliente = {}
-    registrosMes?.forEach(r => {
+    registrosMes.forEach(r => {
       const nombre = r.clientes?.nombre || 'Sin cliente'
       porCliente[nombre] = (porCliente[nombre] || 0) + r.horas + r.minutos / 60
     })
@@ -123,7 +135,7 @@ export default function DashboardPage() {
     )
 
     const porAsociado = {}
-    registrosMes?.forEach(r => {
+    registrosMes.forEach(r => {
       const nombre = r.usuarios?.nombre_completo || 'Sin nombre'
       porAsociado[nombre] = (porAsociado[nombre] || 0) + r.horas + r.minutos / 60
     })
@@ -134,7 +146,7 @@ export default function DashboardPage() {
     )
 
     const porArea = {}
-    registrosMes?.forEach(r => {
+    registrosMes.forEach(r => {
       const area = r.usuarios?.area || 'sin área'
       porArea[area] = (porArea[area] || 0) + r.horas + r.minutos / 60
     })
@@ -145,7 +157,7 @@ export default function DashboardPage() {
     )
 
     const porHonorario = {}
-    registrosMes?.forEach(r => {
+    registrosMes.forEach(r => {
       const nombre = r.honorarios?.nombre || 'Sin honorario'
       porHonorario[nombre] = (porHonorario[nombre] || 0) + r.horas + r.minutos / 60
     })
@@ -156,7 +168,7 @@ export default function DashboardPage() {
     )
 
     const horasPorClienteCompleto = {}
-    registrosMes?.forEach(r => {
+    registrosMes.forEach(r => {
       const clave = `${r.cliente_id}_${r.honorario_id}`
       horasPorClienteCompleto[clave] = (horasPorClienteCompleto[clave] || 0) + r.horas + r.minutos / 60
     })
@@ -186,22 +198,36 @@ export default function DashboardPage() {
     setCargando(true)
     const fechaInicio = filtros.fechaInicio || primerDiaMes
     const fechaFin = filtros.fechaFin || ultimoDiaMes
+    const registrosMes = []
 
-    let query = supabase
-      .from('registros')
-      .select('*, clientes(id, nombre), honorarios(id, nombre)')
-      .eq('usuario_id', userId)
-      .gte('fecha_registro', fechaInicio)
-      .lte('fecha_registro', fechaFin)
+    for (let from = 0; ; from += REGISTROS_PAGE_SIZE) {
+      let query = supabase
+        .from('registros')
+        .select('*, clientes(id, nombre), honorarios(id, nombre)')
+        .eq('usuario_id', userId)
+        .gte('fecha_registro', fechaInicio)
+        .lte('fecha_registro', fechaFin)
+        .order('fecha_registro', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, from + REGISTROS_PAGE_SIZE - 1)
 
-    if (filtros.cliente) query = query.eq('cliente_id', parseInt(filtros.cliente))
+      if (filtros.cliente) query = query.eq('cliente_id', parseInt(filtros.cliente))
 
-    const { data: registrosMes } = await query
-    const totalHoras = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
+      const { data, error } = await query
+      if (error) {
+        console.error(error)
+        break
+      }
+
+      registrosMes.push(...(data || []))
+      if (!data || data.length < REGISTROS_PAGE_SIZE) break
+    }
+
+    const totalHoras = registrosMes.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0)
 
     // Agrupar mis horas por cliente y honorario
     const porCliente = {}
-    registrosMes?.forEach(r => {
+    registrosMes.forEach(r => {
       const cId = r.cliente_id
       const hId = r.honorario_id
       if (!porCliente[cId]) porCliente[cId] = { nombre: r.clientes?.nombre, cliente_id: cId, misHoras: 0, honorarios: {} }
