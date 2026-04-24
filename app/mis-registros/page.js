@@ -168,19 +168,40 @@ export default function MisRegistrosPage() {
     return `${dia}/${mes}/${anio}`
   }
 
+  const crearFechaExcel = (fecha) => {
+    const [anio, mes, dia] = fecha.split('-').map(Number)
+    return new Date(anio, mes - 1, dia)
+  }
+
   const formatearTiempo = (horas, minutos) => (horas + minutos / 60).toFixed(2)
 
   const handleDescargarExcel = () => {
     const datos = registros.map(r => ({
-      Fecha: formatearFecha(r.fecha_registro),
+      Fecha: crearFechaExcel(r.fecha_registro),
       Usuario: r.usuarios?.nombre_completo,
       Cliente: r.clientes?.nombre,
       Honorario: r.honorarios?.nombre,
       Actividad: r.actividades?.nombre,
-      Horas: (r.horas + r.minutos / 60).toFixed(2),
+      Horas: Number((r.horas + r.minutos / 60).toFixed(2)),
       Comentario: r.comentario || ''
     }))
     const worksheet = XLSX.utils.json_to_sheet(datos)
+    worksheet['!cols'] = [
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 34 },
+      { wch: 28 },
+      { wch: 34 },
+      { wch: 10 },
+      { wch: 45 },
+    ]
+
+    registros.forEach((_, index) => {
+      const row = index + 2
+      if (worksheet[`A${row}`]) worksheet[`A${row}`].z = 'dd/mm/yyyy'
+      if (worksheet[`F${row}`]) worksheet[`F${row}`].z = '0.00'
+    })
+
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Registros')
     XLSX.writeFile(workbook, `registros-${new Date().toISOString().split('T')[0]}.xlsx`)
