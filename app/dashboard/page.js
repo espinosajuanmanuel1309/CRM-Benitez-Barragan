@@ -19,8 +19,8 @@ export default function DashboardPage() {
   const [misHoras, setMisHoras] = useState({ total: 0, porCliente: [] })
   const [clientes, setClientes] = useState([])
   const [usuarios, setUsuarios] = useState([])
-  const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
-  const [filtroFechaFin, setFiltroFechaFin] = useState('')
+  const [filtroMes, setFiltroMes] = useState(new Date().getMonth() + 1)
+  const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear())
   const [filtroCliente, setFiltroCliente] = useState('')
   const [filtroAsociado, setFiltroAsociado] = useState('')
   const [usuarioActualId, setUsuarioActualId] = useState(null)
@@ -83,18 +83,29 @@ export default function DashboardPage() {
     if (filtros.cliente) queryRegistros = queryRegistros.eq('cliente_id', parseInt(filtros.cliente))
     if (filtros.asociado) queryRegistros = queryRegistros.eq('usuario_id', filtros.asociado)
 
+    let queryBudget = supabase
+      .from('registros')
+      .select('horas, minutos, cliente_id, honorario_id')
+      .gte('fecha_registro', fechaInicio)
+      .lte('fecha_registro', fechaFin)
+    if (filtros.cliente) queryBudget = queryBudget.eq('cliente_id', parseInt(filtros.cliente))
+
+    const anioFiltro = parseInt(fechaInicio.split('-')[0])
+
     const [
       { data: registrosMes },
       { data: registrosMesAnterior },
       { data: clientesData },
       { data: usuariosData },
-      { data: presupuestos }
+      { data: presupuestos },
+      { data: registrosBudget }
     ] = await Promise.all([
       queryRegistros,
       supabase.from('registros').select('horas, minutos').gte('fecha_registro', primerDiaMesAnterior).lte('fecha_registro', ultimoDiaMesAnterior),
       supabase.from('clientes').select('*').eq('activo', true),
       supabase.from('usuarios').select('*').eq('activo', true),
-      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioActual)
+      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioFiltro),
+      queryBudget
     ])
 
     const totalHorasMes = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
@@ -153,7 +164,7 @@ export default function DashboardPage() {
     )
 
     const horasPorClienteCompleto = {}
-    registrosMes?.forEach(r => {
+    registrosBudget?.forEach(r => {
       const clave = `${r.cliente_id}_${r.honorario_id}`
       horasPorClienteCompleto[clave] = (horasPorClienteCompleto[clave] || 0) + r.horas + r.minutos / 60
     })
@@ -164,7 +175,7 @@ export default function DashboardPage() {
         const clave = `${p.cliente_id}_${p.honorario_id}`
         const horasUsadas = horasPorClienteCompleto[clave] || 0
         const porcentaje = (horasUsadas / p.horas_mes) * 100
-        if (porcentaje >= 80) {
+        if (porcentaje > 100) {
           alertasData.push({
             cliente: p.clientes?.nombre,
             honorario: p.honorarios?.nombre,
@@ -175,7 +186,7 @@ export default function DashboardPage() {
         }
       }
     })
-    setAlertas(alertasData.sort((a, b) => b.porcentaje - a.porcentaje))
+    setAlertas(alertasData.sort((a, b) => (b.horasUsadas - b.horasPresupuesto) - (a.horasUsadas - a.horasPresupuesto)))
     setCargando(false)
   }
 
@@ -256,9 +267,11 @@ export default function DashboardPage() {
   }
 
   const handleFiltrar = () => {
+    const primerDiaMesFiltro = `${filtroAnio}-${String(filtroMes).padStart(2, '0')}-01`
+    const ultimoDiaMesFiltro = new Date(filtroAnio, filtroMes, 0).toISOString().split('T')[0]
     const filtros = {
-      fechaInicio: filtroFechaInicio || primerDiaMes,
-      fechaFin: filtroFechaFin || ultimoDiaMes,
+      fechaInicio: primerDiaMesFiltro,
+      fechaFin: ultimoDiaMesFiltro,
       cliente: filtroCliente || null,
       asociado: filtroAsociado || null
     }
@@ -270,8 +283,8 @@ export default function DashboardPage() {
   }
 
   const handleLimpiar = () => {
-    setFiltroFechaInicio('')
-    setFiltroFechaFin('')
+    setFiltroMes(mesActual)
+    setFiltroAnio(anioActual)
     setFiltroCliente('')
     setFiltroAsociado('')
     if (rol === 'admin') {
@@ -281,6 +294,7 @@ export default function DashboardPage() {
     }
   }
 
+  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
   const COLORS = ['#1B2A4A', '#2E4A8C', '#4A7CC9', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981']
 
   const nombreMes = new Date(anioActual, mesActual - 1).toLocaleString('es-MX', { month: 'long', year: 'numeric' })
@@ -318,14 +332,16 @@ export default function DashboardPage() {
             <p style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', letterSpacing: '1px', textTransform: 'uppercase', margin: '0 0 14px' }}>Filtros</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Fecha inicio</label>
-                <input type="date" value={filtroFechaInicio} onChange={e => setFiltroFechaInicio(e.target.value)}
-                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }} />
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Mes</label>
+                <select value={filtroMes} onChange={e => setFiltroMes(parseInt(e.target.value))}
+                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }}>
+                  {meses.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Fecha fin</label>
-                <input type="date" value={filtroFechaFin} onChange={e => setFiltroFechaFin(e.target.value)}
-                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937' }} />
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Año</label>
+                <input type="number" value={filtroAnio} onChange={e => setFiltroAnio(parseInt(e.target.value))} min="2020" max="2099"
+                  style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', backgroundColor: '#fafafa', color: '#1f2937', width: '90px' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Cliente</label>
