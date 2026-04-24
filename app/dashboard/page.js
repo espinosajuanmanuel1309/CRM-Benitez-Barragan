@@ -73,39 +73,31 @@ export default function DashboardPage() {
     setCargando(true)
     const fechaInicio = filtros.fechaInicio || primerDiaMes
     const fechaFin = filtros.fechaFin || ultimoDiaMes
-
-    let queryRegistros = supabase
-      .from('registros')
-      .select('*, clientes(nombre), honorarios(nombre), usuarios(nombre_completo, area)')
-      .gte('fecha_registro', fechaInicio)
-      .lte('fecha_registro', fechaFin)
-
-    if (filtros.cliente) queryRegistros = queryRegistros.eq('cliente_id', parseInt(filtros.cliente))
-    if (filtros.asociado) queryRegistros = queryRegistros.eq('usuario_id', filtros.asociado)
-
     const anioFiltro = parseInt(fechaInicio.split('-')[0])
 
-    let queryRegistrosAnio = supabase
-      .from('registros')
-      .select('horas, minutos, cliente_id, honorario_id')
-      .gte('fecha_registro', `${anioFiltro}-01-01`)
-      .lte('fecha_registro', `${anioFiltro}-12-31`)
-    if (filtros.cliente) queryRegistrosAnio = queryRegistrosAnio.eq('cliente_id', parseInt(filtros.cliente))
+    const { data: { session } } = await supabase.auth.getSession()
+    const resRegistros = await fetch('/api/admin-registros', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        fechaInicio,
+        fechaFin,
+        clienteId: filtros.cliente ? parseInt(filtros.cliente) : null,
+        asociadoId: filtros.asociado || null
+      })
+    })
+    const { registros: registrosMes } = await resRegistros.json()
 
     const [
-      { data: registrosMes },
       { data: registrosMesAnterior },
       { data: clientesData },
       { data: usuariosData },
-      { data: presupuestos },
-      { data: registrosAnio }
+      { data: presupuestos }
     ] = await Promise.all([
-      queryRegistros,
       supabase.from('registros').select('horas, minutos').gte('fecha_registro', primerDiaMesAnterior).lte('fecha_registro', ultimoDiaMesAnterior),
       supabase.from('clientes').select('*').eq('activo', true),
       supabase.from('usuarios').select('*').eq('activo', true),
-      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioFiltro),
-      queryRegistrosAnio
+      supabase.from('presupuestos').select('*, clientes(nombre), honorarios(nombre)').eq('anio', anioFiltro)
     ])
 
     const totalHorasMes = registrosMes?.reduce((acc, r) => acc + r.horas + r.minutos / 60, 0) || 0
@@ -164,7 +156,7 @@ export default function DashboardPage() {
     )
 
     const horasPorClienteCompleto = {}
-    registrosAnio?.forEach(r => {
+    registrosMes?.forEach(r => {
       const clave = `${r.cliente_id}_${r.honorario_id}`
       horasPorClienteCompleto[clave] = (horasPorClienteCompleto[clave] || 0) + r.horas + r.minutos / 60
     })
