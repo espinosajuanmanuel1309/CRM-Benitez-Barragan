@@ -141,6 +141,7 @@ export default function Sidebar({ rol, nombreUsuario }) {
               <SidebarItem label="Usuarios" icon="👥" isActive={isActive('/admin/usuarios')} onClick={() => navigate('/admin/usuarios')} />
               <SidebarItem label="Honorarios" icon="📁" isActive={isActive('/admin/honorarios')} onClick={() => navigate('/admin/honorarios')} />
               <SidebarItem label="Presupuestos" icon="💰" isActive={isActive('/admin/presupuestos')} onClick={() => navigate('/admin/presupuestos')} />
+              <SidebarItem label="Importar registros" icon="⇧" isActive={isActive('/admin/importar-registros')} onClick={() => navigate('/admin/importar-registros')} />
             </>
           )}
         </div>
