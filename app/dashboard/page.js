@@ -512,7 +512,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Horas por área */}
-              <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db' }}>
+              <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.10)', border: '1px solid #d1d5db', marginTop: '24px' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#1B2A4A', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Horas por área</h3>
                 <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 16px' }}>Distribución del trabajo por área del despacho</p>
                 <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
