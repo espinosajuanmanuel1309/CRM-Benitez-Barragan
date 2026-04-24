@@ -379,7 +379,7 @@ export default function DashboardPage() {
               {/* KPIs */}
               <div className="kpi-grid" style={{ gap: '16px', marginBottom: '28px' }}>
                 {[
-                  { label: 'Horas del período', value: `${kpis.horasMes.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A', sub: variacionMes && !filtroFechaInicio ? `${parseFloat(variacionMes) >= 0 ? '↑' : '↓'} ${Math.abs(variacionMes)}% vs mes anterior` : null, subOk: parseFloat(variacionMes) >= 0 },
+                  { label: 'Horas del período', value: `${kpis.horasMes.toFixed(1)}h`, icon: '⏱', bg: '#1B2A4A', sub: variacionMes && filtroMes === mesActual && filtroAnio === anioActual ? `${parseFloat(variacionMes) >= 0 ? '↑' : '↓'} ${Math.abs(variacionMes)}% vs mes anterior` : null, subOk: parseFloat(variacionMes) >= 0 },
                   { label: 'Mes anterior', value: `${kpis.horasMesAnterior.toFixed(1)}h`, icon: '📅', bg: '#2E4A8C' },
                   { label: 'Clientes activos', value: kpis.clientesActivos, icon: '🏢', bg: '#1B2A4A' },
                   { label: 'Asociados activos', value: kpis.asociadosActivos, icon: '👥', bg: '#2E4A8C' },
